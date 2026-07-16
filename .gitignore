@@ -1,0 +1,11 @@
+.DS_Store
+.env
+.env.*
+*.log
+*.codex-theme
+coverage/
+outputs/
+tmp/
+themes/*
+!themes/aurora-focus/
+!themes/aurora-focus/**

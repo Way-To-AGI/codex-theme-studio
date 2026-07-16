@@ -1,0 +1,31 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: |
+          for file in scripts/*.mjs assets/renderer-inject.js; do
+            node --check "$file"
+          done
+      - name: Run Skill self-test
+        run: node scripts/self-test.mjs
+      - name: Reject private or machine-specific data
+        run: |
+          if grep -RInE '/Users/|liurenpeng|@meituan\.com|sankuai|BEGIN (RSA|OPENSSH|EC|PRIVATE)' \
+            --exclude-dir=.git --exclude=test.yml .; then
+            echo "Private or machine-specific data found."
+            exit 1
+          fi

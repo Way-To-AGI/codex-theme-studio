@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "engine": "codex-theme-studio",
+  "id": "aurora-focus",
+  "displayName": "Aurora Focus",
+  "version": "1.0.0",
+  "css": "theme.css",
+  "art": "background.png",
+  "design": {
+    "mode": "dark",
+    "direction": "aurora-glass",
+    "palette": {
+      "accent": "#64DDF2",
+      "support": "#A58BFA",
+      "surface": "#0D1420",
+      "ink": "#F2F7FA"
+    },
+    "shape": {
+      "radius": 18,
+      "shadow": "soft"
+    }
+  },
+  "background": {
+    "source": "builtin",
+    "position": "center right",
+    "veil": 0.78,
+    "prompt": "quiet aurora over a glass observatory, wide composition, negative space in the center"
+  },
+  "decorations": {
+    "density": "light",
+    "sidebarWidget": {
+      "enabled": true,
+      "icon": "✦",
+      "eyebrow": "CODEX / STUDIO",
+      "title": "Focus mode",
+      "caption": "Theme synchronized"
+    },
+    "cornerCard": {
+      "enabled": false,
+      "icon": "C",
+      "eyebrow": "CREATIVE SPACE",
+      "title": "Build with clarity",
+      "caption": "Ideas in motion"
+    }
+  },
+  "copy": {
+    "brandTitle": "Aurora Focus",
+    "brandSubtitle": "Codex Theme Studio",
+    "signature": "Build with clarity",
+    "tagline": "Build with clarity",
+    "projectPrefix": "选择项目 · ",
+    "projectLabel": "选择项目",
+    "ribbon": "C"
+  },
+  "baseTheme": {
+    "mode": "dark",
+    "codeTheme": "codex",
+    "accent": "#64DDF2",
+    "contrast": 171,
+    "ink": "#F2F7FA",
+    "surface": "#0D1420",
+    "opaqueWindows": true,
+    "fonts": {
+      "windowsCode": "Cascadia Code",
+      "windowsUi": "Microsoft YaHei UI",
+      "macCode": "SF Mono",
+      "macUi": "PingFang SC"
+    },
+    "semanticColors": {
+      "diffAdded": "#2F7D57",
+      "diffRemoved": "#8E3F52",
+      "skill": "#A58BFA"
+    }
+  }
+}

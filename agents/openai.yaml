@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Theme Studio"
+  short_description: "交互式生成、预览、应用并验证精致 Codex 主题"
+  default_prompt: "Use $codex-theme-studio to guide me through creating and applying a polished Codex theme."

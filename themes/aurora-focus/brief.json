@@ -1,0 +1,44 @@
+{
+  "id": "aurora-focus",
+  "name": "Aurora Focus",
+  "version": "1.0.0",
+  "mode": "dark",
+  "direction": "aurora-glass",
+  "palette": {
+    "accent": "#64DDF2",
+    "support": "#A58BFA",
+    "surface": "#0D1420",
+    "ink": "#F2F7FA"
+  },
+  "background": {
+    "source": "builtin",
+    "position": "center right",
+    "veil": 0.78,
+    "prompt": "quiet aurora over a glass observatory, wide composition, negative space in the center"
+  },
+  "shape": {
+    "radius": 18,
+    "shadow": "soft"
+  },
+  "decorations": {
+    "density": "light",
+    "sidebarWidget": {
+      "enabled": true,
+      "icon": "✦",
+      "eyebrow": "CODEX / STUDIO",
+      "title": "Focus mode",
+      "caption": "Theme synchronized"
+    },
+    "cornerCard": {
+      "enabled": false,
+      "icon": "C",
+      "eyebrow": "CREATIVE SPACE",
+      "title": "Build with clarity",
+      "caption": "Ideas in motion"
+    }
+  },
+  "copy": {
+    "tagline": "Build with clarity"
+  },
+  "corrections": []
+}
