@@ -22,6 +22,8 @@ jobs:
           done
       - name: Run Skill self-test
         run: node scripts/self-test.mjs
+      - name: Run studio handoff protocol test
+        run: node scripts/studio-protocol-test.mjs
       - name: Reject private or machine-specific data
         run: |
           if grep -RInE '/Users/|liurenpeng|@meituan\.com|sankuai|BEGIN (RSA|OPENSSH|EC|PRIVATE)' \

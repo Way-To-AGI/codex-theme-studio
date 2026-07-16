@@ -50,17 +50,19 @@ git -C "${CODEX_HOME:-$HOME/.codex}/skills/codex-theme-studio" pull --ff-only
 
 ```bash
 cd "${CODEX_HOME:-$HOME/.codex}/skills/codex-theme-studio"
-node scripts/studio-server.mjs
+node scripts/studio-server.mjs --wait-for-submit
 ```
 
-服务只监听 `127.0.0.1`，随后会打开本地工作台。用户依次选择：
+服务只监听 `127.0.0.1`，随后会打开本地工作台。`--wait-for-submit` 会让调用它的 Agent 保持等待，并在用户提交后收到 `briefPath`、主题 ID、背景模式以及可选的上传图片路径。用户依次选择：
 
 1. 明暗模式和设计方向。
 2. 配色、圆角和阴影体系。
 3. 背景来源、构图位置和阅读遮罩。
 4. 装饰密度和主题文案。
 
-生成结果保存在 `themes/<theme-id>/`。
+点击“提交设计并让 Agent 继续”后，工作台会原子保存 `brief.json` 并把结果交回 Agent。页面会明确提示无需再发送消息；Agent 必须继续生成背景、编译、应用、截图验证和迭代，不能停在 HTML 页面。
+
+不带 `--wait-for-submit` 启动时是独立模式：页面只保存设计方案，并明确提示当前没有等待中的 Agent，不会自行编译或应用主题。
 
 ## 在 Codex 中使用
 

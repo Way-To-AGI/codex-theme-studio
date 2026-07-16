@@ -9,7 +9,7 @@ Create reversible Codex themes through a constrained design brief and loopback C
 
 ## Choose the workflow
 
-- Start the visual questionnaire with `node scripts/studio-server.mjs`; use the resulting manifest path for apply/export.
+- Start the user-driven studio with `node scripts/studio-server.mjs --wait-for-submit`. Keep that process attached until it emits the `submitted` event, then continue from its `briefPath`.
 - Generate directly from a JSON brief with `node scripts/compile-theme.mjs --brief /absolute/brief.json [--art /absolute/art.png]`.
 - Apply with `node scripts/start-theme.mjs --theme <id-or-manifest>`. Add `--restart-existing` only after explicit authorization.
 - Verify with `node scripts/runtime.mjs --verify --theme <id-or-manifest> --screenshot /absolute/theme.png` and inspect the screenshot.
@@ -21,13 +21,28 @@ Read `references/theme-schema.md` before changing the brief or manifest. Read `r
 
 ## Guided creation
 
-1. Launch the studio and let the user choose mode, direction, palette, background, decoration density, shape, and copy. Prefer the HTML flow over a long chat questionnaire.
-2. Treat the saved brief as declarative input. Never accept arbitrary HTML, JavaScript, event handlers, selectors, or CSS through the brief.
-3. If the user selects AI artwork, use an image-generation skill. Generate a wide composition with quiet negative space behind the reading column and composer. Save the final bitmap locally, then compile with `--art`.
-4. Compile the brief. The compiler corrects unsafe text contrast, derives semantic surfaces, embeds only local artwork, and emits a manifest plus CSS.
-5. Preview home, task, code/diff/terminal, dialog, and compact states in the studio before applying.
-6. Apply to a separate test profile first when practical. Use the user's primary profile only after the theme passes static checks.
-7. Verify functional controls and capture a real Codex screenshot. Iterate until the background, surfaces, typography, composer, and decorations are coherent and unobstructed.
+1. Launch `node scripts/studio-server.mjs --wait-for-submit` in a long-running command session. Tell the user that the local studio is open, they should make the choices and click the final submit button, and no additional chat message is required.
+2. The user owns aesthetic choices by default. Do not click or fill the studio for them unless they explicitly ask the Agent to choose. Keep the current Agent turn active and poll the running command instead of ending at the HTML step.
+3. Wait for exactly one JSONL handoff event on stdout. A successful event has this contract:
+
+   ```json
+   {
+     "status": "submitted",
+     "briefPath": "/absolute/session/brief.json",
+     "themeId": "custom-theme",
+     "backgroundMode": "generated"
+   }
+   ```
+
+   Uploaded artwork also includes `artPath`. On `timeout`, report that the design session expired and start a new session only if the user wants to continue.
+4. Read `briefPath` as declarative input. Never accept arbitrary HTML, JavaScript, event handlers, selectors, or CSS through the brief.
+5. If `backgroundMode` is `generated`, use an image-generation skill. Generate a wide composition with quiet negative space behind the reading column and composer. If it is `upload`, use the returned `artPath`. Save the final bitmap locally, then compile with `--art`.
+6. Compile the brief. The compiler corrects unsafe text contrast, derives semantic surfaces, embeds only local artwork, and emits a manifest plus CSS.
+7. Preview home, task, code/diff/terminal, dialog, and compact states before applying.
+8. Apply to a separate test profile first when practical. Use the user's primary profile only after the theme passes static checks.
+9. Verify functional controls and capture a real Codex screenshot. Iterate until the background, surfaces, typography, composer, and decorations are coherent and unobstructed. Do not claim completion from the HTML submission alone.
+
+Running `node scripts/studio-server.mjs` without `--wait-for-submit` is a standalone fallback. It saves `brief.json`, but the page clearly warns that no Agent is waiting; it does not compile or apply a theme by itself.
 
 The bundled `aurora-focus` sample demonstrates a calm dark background and safe light decoration density. Use it as a working baseline, not as a mandatory visual direction.
 
@@ -66,5 +81,6 @@ Run:
 
 ```bash
 node scripts/self-test.mjs
+node scripts/studio-protocol-test.mjs
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" .
 ```

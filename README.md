@@ -50,17 +50,19 @@ git -C "${CODEX_HOME:-$HOME/.codex}/skills/codex-theme-studio" pull --ff-only
 
 ```bash
 cd "${CODEX_HOME:-$HOME/.codex}/skills/codex-theme-studio"
-node scripts/studio-server.mjs
+node scripts/studio-server.mjs --wait-for-submit
 ```
 
-The server binds only to `127.0.0.1` and opens the local studio in your browser. Choose:
+The server binds only to `127.0.0.1` and opens the local studio in your browser. `--wait-for-submit` keeps the calling Agent attached and returns the saved `briefPath`, theme ID, background mode, and optional uploaded-art path after submission. Choose:
 
 1. Mode and design direction.
 2. Palette, radius, and shadow system.
 3. Background source, focal position, and reading veil.
 4. Decoration density and copy.
 
-The generated theme is written under `themes/<theme-id>/`.
+After **Submit design and continue**, the studio atomically saves `brief.json` and hands the result back to the Agent. The page says that no extra message is needed; the Agent must continue through artwork generation, compilation, application, screenshot verification, and iteration instead of stopping at the HTML page.
+
+Launching without `--wait-for-submit` is a standalone fallback. It saves the design brief and clearly warns that no Agent is waiting; it does not compile or apply a theme by itself.
 
 ## Use from Codex
 
