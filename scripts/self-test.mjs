@@ -74,12 +74,14 @@ try {
   const switcher = await fs.readFile(new URL("../assets/switcher/index.html", import.meta.url), "utf8");
   const inAppSwitcher = await fs.readFile(new URL("../assets/theme-switcher.js", import.meta.url), "utf8");
   const cli = await fs.readFile(new URL("./theme.mjs", import.meta.url), "utf8");
+  const runtime = await fs.readFile(new URL("./runtime.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(switcher, /https?:\/\//i);
   assert.doesNotMatch(switcher, /\.innerHTML\s*=/);
   assert.doesNotMatch(inAppSwitcher, /\.innerHTML\s*=/);
   assert.match(inAppSwitcher, /Switch Codex theme/);
   for (const command of ["list", "status", "use", "native", "restore", "web", "studio"]) assert.match(cli, new RegExp(`command === "${command}"`));
-  console.log(JSON.stringify({ pass: true, checks: 46 }, null, 2));
+  assert.match(runtime, /\/avatar-overlay/);
+  console.log(JSON.stringify({ pass: true, checks: 47 }, null, 2));
 } finally {
   await fs.rm(temporary, { recursive: true, force: true });
 }

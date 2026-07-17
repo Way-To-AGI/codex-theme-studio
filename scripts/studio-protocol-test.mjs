@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { fileURLToPath } from "node:url";
 
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "codex-theme-studio-protocol-"));
 
@@ -42,7 +43,7 @@ function waitForJsonLine(child, predicate) {
 
 async function runSession(backgroundMode, artDataUrl = null, checkSecurity = false) {
   const child = spawn(process.execPath, [
-    new URL("./studio-server.mjs", import.meta.url).pathname,
+    fileURLToPath(new URL("./studio-server.mjs", import.meta.url)),
     "--port", "0",
     "--no-open",
     "--wait-for-submit",

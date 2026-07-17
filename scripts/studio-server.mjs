@@ -4,9 +4,9 @@ import fs from "node:fs/promises";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { normalizeBrief } from "./theme-core.mjs";
+import { openLoopbackUrl } from "./platform-runtime.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -178,7 +178,7 @@ server.listen(options.port, "127.0.0.1", () => {
   actualOrigin = `http://127.0.0.1:${address.port}`;
   const url = `${actualOrigin}/`;
   console.log(JSON.stringify({ ready: true, url, pid: process.pid, sessionId, agentConnected: options.waitForSubmit }));
-  if (options.open && process.platform === "darwin") spawn("open", [url], { detached: true, stdio: "ignore" }).unref();
+  if (options.open) openLoopbackUrl(url);
   if (options.waitForSubmit) {
     timeout = setTimeout(() => {
       phase = "timeout";
