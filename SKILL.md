@@ -1,6 +1,6 @@
 ---
 name: codex-theme-studio
-description: Interactively design, generate, preview, apply, hot-switch, verify, export, repair, or safely remove polished decorative themes for the official Codex desktop app on macOS. Use when a user wants a guided HTML theme studio, visual theme library, in-app theme picker, command-line theme switching, custom Codex skin from a brief or reference image, background image, coordinated colors, safe non-blocking decorations, portable .codex-theme package, live compatibility inspection, or one-click restoration without modifying ChatGPT.app or app.asar.
+description: Interactively design, generate, preview, apply, hot-switch, verify, export, repair, or safely remove polished decorative themes for the official Codex desktop app on macOS or Windows. Use when a user wants a guided HTML theme studio, visual theme library, in-app theme picker, command-line theme switching, custom Codex skin from a brief or reference image, background image, coordinated colors, safe non-blocking decorations, portable .codex-theme package, live compatibility inspection, or one-click restoration without modifying ChatGPT.app, WindowsApps, or app.asar.
 ---
 
 # Codex Theme Studio
@@ -85,6 +85,7 @@ The bundled `aurora-focus` sample demonstrates a calm dark background and safe l
 - Never patch, replace, re-sign, or take ownership of `/Applications/ChatGPT.app`, WindowsApps, or `app.asar`.
 - Bind CDP only to `127.0.0.1`. Stop on port conflicts.
 - Never terminate Codex unless the user authorized a restart and the process command identifies the official executable.
+- On Windows, accept only a valid OpenAI-signed `ChatGPT.exe` or `Codex.exe`; never weaken ACLs or force-terminate the app.
 - Never modify native `position`, `z-index`, layout ownership, or the geometry of `#root`.
 - Reject `@import`, external CSS URLs, executable CSS, unsafe asset names, and packages over 30 MB.
 - Treat selectors as version-sensitive. If structural anchors fail after an update, fall back to token-only styling and report that repair is required.
@@ -98,5 +99,6 @@ Run:
 node scripts/self-test.mjs
 node scripts/studio-protocol-test.mjs
 node scripts/theme-control-test.mjs
+node scripts/platform-runtime-test.mjs
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" .
 ```

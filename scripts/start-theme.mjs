@@ -2,24 +2,25 @@
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import net from "node:net";
-import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { loadTheme } from "./theme-core.mjs";
+import { commandFor, findOfficialApp, officialAppPids, requestOfficialAppQuit, securePrivateDirectory, securePrivateFile, statePathFor, stateRootFor } from "./platform-runtime.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runtimePath = path.join(here, "runtime.mjs");
-const stateRoot = path.join(os.homedir(), "Library", "Application Support", "CodexThemeStudio");
-const statePath = path.join(stateRoot, "state.json");
+const stateRoot = stateRootFor();
+const statePath = statePathFor();
 
 function parseArgs(argv) {
-  const options = { theme: null, port: 9335, profilePath: null, restartExisting: false, foreground: false, screenshot: null };
+  const options = { theme: null, port: 9335, profilePath: null, appPath: null, restartExisting: false, foreground: false, screenshot: null };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--theme") options.theme = argv[++index];
     else if (arg === "--port") options.port = Number(argv[++index]);
     else if (arg === "--profile-path") options.profilePath = path.resolve(argv[++index]);
+    else if (arg === "--app-path") options.appPath = path.resolve(argv[++index]);
     else if (arg === "--restart-existing") options.restartExisting = true;
     else if (arg === "--foreground") options.foreground = true;
     else if (arg === "--screenshot") options.screenshot = path.resolve(argv[++index]);
@@ -38,34 +39,12 @@ async function cdpReady(port) {
   } catch { return false; }
 }
 
-function processRows() {
-  return spawnSync("ps", ["-axo", "pid=,command="], { encoding: "utf8" }).stdout.split("\n")
-    .map((line) => line.trim()).filter(Boolean)
-    .map((line) => ({ pid: Number(line.match(/^\d+/)?.[0]), command: line.replace(/^\d+\s+/, "") }));
-}
-
-function primaryCodexPids() {
-  return processRows().filter((row) => /\/ChatGPT\.app\/Contents\/MacOS\/ChatGPT(?:\s|$)/.test(row.command)).map((row) => row.pid);
-}
-
-function commandFor(pid) {
-  return spawnSync("ps", ["-p", String(pid), "-o", "command="], { encoding: "utf8" }).stdout.trim();
-}
-
 function stopPreviousWatcher(state) {
   if (!state?.watcherPid) return;
   const command = commandFor(state.watcherPid);
   if (command.includes(runtimePath) && command.includes("--watch")) {
     try { process.kill(state.watcherPid, "SIGTERM"); } catch { /* stale */ }
   }
-}
-
-async function findApp() {
-  for (const candidate of ["/Applications/ChatGPT.app", path.join(os.homedir(), "Applications", "ChatGPT.app")]) {
-    const executable = path.join(candidate, "Contents", "MacOS", "ChatGPT");
-    try { await fs.access(executable); return executable; } catch { /* continue */ }
-  }
-  throw new Error("Official Codex app was not found");
 }
 
 async function waitReady(port, timeoutMs = 30000) {
@@ -92,6 +71,16 @@ async function freeLoopbackPort() {
   });
 }
 
+async function assertLoopbackPortAvailable(port) {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", (error) => reject(error.code === "EADDRINUSE"
+      ? new Error(`Port ${port} is already in use by a non-Codex service`)
+      : error));
+    server.listen(port, "127.0.0.1", () => server.close((error) => error ? reject(error) : resolve()));
+  });
+}
+
 const options = parseArgs(process.argv.slice(2));
 const theme = await loadTheme(options.theme);
 const appearance = theme.manifest.appearance ?? {
@@ -106,22 +95,23 @@ console.log(JSON.stringify({
     ? "This theme is designed for dark appearance. Keep Codex in dark mode to avoid mixed native surfaces."
     : "This theme is designed for light appearance. Keep Codex in light mode to avoid mixed native surfaces.",
 }));
-await fs.mkdir(stateRoot, { recursive: true });
+await securePrivateDirectory(stateRoot);
 let previousState = null;
 try { previousState = JSON.parse(await fs.readFile(statePath, "utf8")); } catch { /* first run */ }
 stopPreviousWatcher(previousState);
 
 if (!(await cdpReady(options.port))) {
-  if (primaryCodexPids().length && !options.profilePath && !options.restartExisting) {
+  await assertLoopbackPortAvailable(options.port);
+  const executable = await findOfficialApp({ explicitPath: options.appPath ?? process.env.CODEX_THEME_STUDIO_APP_PATH });
+  if (officialAppPids(executable).length && !options.profilePath && !options.restartExisting) {
     throw new Error("Codex is already running without Theme Studio CDP. Close it or rerun with --restart-existing after explicit authorization.");
   }
-  if (options.restartExisting && !options.profilePath && primaryCodexPids().length) {
-    spawnSync("osascript", ["-e", "tell application id \"com.openai.codex\" to quit"], { stdio: "ignore" });
+  if (options.restartExisting && !options.profilePath && officialAppPids(executable).length) {
+    requestOfficialAppQuit(executable);
     const deadline = Date.now() + 10000;
-    while (primaryCodexPids().length && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 250));
-    if (primaryCodexPids().length) throw new Error("Codex did not quit cleanly; refusing to force terminate it");
+    while (officialAppPids(executable).length && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 250));
+    if (officialAppPids(executable).length) throw new Error("Codex did not quit cleanly; refusing to force terminate it");
   }
-  const executable = await findApp();
   const appArgs = [`--remote-debugging-address=127.0.0.1`, `--remote-debugging-port=${options.port}`];
   if (options.profilePath) {
     await fs.mkdir(options.profilePath, { recursive: true });
@@ -158,7 +148,7 @@ await fs.writeFile(statePath, `${JSON.stringify({
   profilePath: options.profilePath,
   startedAt: new Date().toISOString(),
 }, null, 2)}\n`, "utf8");
-await fs.chmod(statePath, 0o600);
+await securePrivateFile(statePath);
 
 let verified = false;
 const verifyMode = options.profilePath ? "--smoke" : "--verify";

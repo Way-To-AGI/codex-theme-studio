@@ -1,17 +1,21 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { listThemes, loadTheme } from "./theme-core.mjs";
+import { statePathFor } from "./platform-runtime.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const statePath = path.join(os.homedir(), "Library", "Application Support", "CodexThemeStudio", "state.json");
+const statePath = statePathFor();
 const argv = process.argv.slice(2);
 const command = argv[0] ?? "help";
 const jsonOutput = argv.includes("--json");
 const restartExisting = argv.includes("--restart-existing");
+const appPathIndex = argv.indexOf("--app-path");
+const appPath = appPathIndex >= 0 ? argv[appPathIndex + 1] : null;
+if (appPathIndex >= 0 && (!appPath || appPath.startsWith("--"))) throw new Error("--app-path requires an executable path");
+const startOptions = [...(restartExisting ? ["--restart-existing"] : []), ...(appPath ? ["--app-path", appPath] : [])];
 
 async function state() { try { return JSON.parse(await fs.readFile(statePath, "utf8")); } catch { return {}; } }
 
@@ -54,16 +58,16 @@ if (command === "list") {
   if (jsonOutput) print({ activeTheme: current.activeTheme ?? null, themes });
   else for (const theme of themes) console.log(`${theme.id === current.activeTheme ? "*" : " "} ${theme.id.padEnd(20)} ${theme.displayName} [${theme.designedFor}]`);
 } else if (command === "status") {
-  try { print({ running: true, ...(await control("themes")) }); }
-  catch { const current = await state(); print({ running: false, activeTheme: current.activeTheme ?? null }); }
+  try { const current = await control("themes"); const runtimeReady = current.runtimeReady === true; print({ ...current, running: runtimeReady, managerRunning: true, runtimeReady }); }
+  catch { const current = await state(); print({ running: false, managerRunning: false, runtimeReady: false, activeTheme: current.activeTheme ?? null }); }
 } else if (command === "use") {
   const id = argv[1]; if (!id || id.startsWith("--")) throw new Error("Usage: theme.mjs use <theme-id> [--restart-existing]");
   const theme = await loadTheme(id);
   let running = false;
-  try { await control("themes"); running = true; } catch { /* start below */ }
+  try { running = (await control("themes")).runtimeReady === true; } catch { /* start below */ }
   if (running) print(await control("switch", { theme: theme.manifest.id }));
   else {
-    run("start-theme.mjs", ["--theme", theme.manifest.id, ...(restartExisting ? ["--restart-existing"] : [])]);
+    run("start-theme.mjs", ["--theme", theme.manifest.id, ...startOptions]);
     print(await waitControl());
   }
 } else if (command === "native") {
@@ -74,14 +78,14 @@ if (command === "list") {
   catch { run("restore-theme.mjs", []); print({ restored: true, stopped: true }); }
 } else if (command === "web") {
   let running = false;
-  try { await control("themes"); running = true; } catch { /* start below */ }
+  try { running = (await control("themes")).runtimeReady === true; } catch { /* start below */ }
   if (running) { await control("open", {}); print({ opened: true }); }
   else {
     const themes = await listThemes();
     if (!themes.length) throw new Error("No valid themes are installed");
     const current = await state();
     const initial = themes.some((item) => item.id === current.activeTheme) ? current.activeTheme : themes[0].id;
-    run("start-theme.mjs", ["--theme", initial, ...(restartExisting ? ["--restart-existing"] : [])]);
+    run("start-theme.mjs", ["--theme", initial, ...startOptions]);
     await waitControl(); await control("open", {}); print({ opened: true, initialTheme: initial });
   }
 } else if (command === "studio") {
@@ -92,9 +96,13 @@ if (command === "list") {
 
   list [--json]                 List trusted themes
   status [--json]               Show manager status
-  use <id> [--restart-existing] Apply or hot-switch a theme
+  use <id> [options]             Apply or hot-switch a theme
   native                        Restore native appearance, keep manager
   restore                       Restore native appearance and stop manager
-  web [--restart-existing]      Open the visual theme library
-  studio                        Open the theme creation studio`);
+  web [options]                  Open the visual theme library
+  studio                        Open the theme creation studio
+
+Options:
+  --restart-existing            Allow one graceful Codex restart
+  --app-path <executable>       Use a signed ChatGPT.exe or Codex.exe`);
 }

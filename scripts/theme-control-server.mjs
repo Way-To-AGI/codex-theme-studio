@@ -4,6 +4,7 @@ import http from "node:http";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { openLoopbackUrl } from "./platform-runtime.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -38,7 +39,7 @@ async function readBody(request) {
 }
 
 function open(url) {
-  if (process.platform === "darwin") spawn("open", [url], { detached: true, stdio: "ignore" }).unref();
+  openLoopbackUrl(url);
 }
 
 async function startStudio() {
@@ -63,7 +64,7 @@ async function startStudio() {
 }
 
 export async function startThemeControl(options) {
-  const { port, token, listThemes, currentTheme, switchTheme, nativeTheme, shutdownTheme, readArtwork } = options;
+  const { port, token, listThemes, currentTheme, runtimeReady, switchTheme, nativeTheme, shutdownTheme, readArtwork } = options;
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error(`Invalid control port: ${port}`);
   if (typeof token !== "string" || token.length < 32) throw new Error("Control token must contain at least 32 characters");
   const html = await fs.readFile(switcherPath, "utf8");
@@ -90,7 +91,7 @@ export async function startThemeControl(options) {
         response.end(html); return;
       }
       if (!tokenMatches(request.headers["x-cts-token"], token)) return json(response, 403, { error: "Invalid control token" }, request.headers.origin || "*");
-      if (request.method === "GET" && url.pathname === "/api/themes") return json(response, 200, { activeTheme: currentTheme(), themes: await listThemes() }, request.headers.origin || "*");
+      if (request.method === "GET" && url.pathname === "/api/themes") return json(response, 200, { activeTheme: currentTheme(), runtimeReady: runtimeReady(), themes: await listThemes() }, request.headers.origin || "*");
       if (request.method === "GET" && url.pathname.startsWith("/api/art/")) {
         const artwork = await readArtwork(decodeURIComponent(url.pathname.slice(9)));
         if (!artwork) return json(response, 404, { error: "Artwork not found" }, request.headers.origin || "*");

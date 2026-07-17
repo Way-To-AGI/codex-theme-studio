@@ -25,16 +25,18 @@
 
 ## 环境要求
 
-- macOS 12 或更高版本。
-- 官方 Codex 桌面应用，通常位于 `/Applications/ChatGPT.app` 或 `~/Applications/ChatGPT.app`。
+- macOS 12 或更高版本，或 Windows 10/11。
+- 官方 Codex 桌面应用：macOS 使用 `ChatGPT.app`，Windows 使用带有效 OpenAI 签名的 `ChatGPT.exe` 或 `Codex.exe`。
 - Node.js 22 或更高版本。
 - 支持本地 Skills 的 Codex。
 
-当前启动和恢复流程面向 macOS。主题编译器、主题包验证、HTML 工作台和测试本身不依赖平台；暂未内置 Windows 启动适配。
+启动器只发现和启动官方签名应用，不修改应用目录、`WindowsApps` 或 `app.asar`。Windows 状态保存在 `%LOCALAPPDATA%\CodexThemeStudio`，并限制为当前用户 ACL。
 
 ## 安装
 
 直接克隆到 Codex Skills 目录：
+
+macOS：
 
 ```bash
 mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
@@ -42,9 +44,17 @@ git clone https://github.com/Way-To-AGI/codex-theme-studio.git \
   "${CODEX_HOME:-$HOME/.codex}/skills/codex-theme-studio"
 ```
 
+Windows PowerShell：
+
+```powershell
+$skillRoot = Join-Path $env:USERPROFILE ".codex\skills"
+New-Item -ItemType Directory -Force $skillRoot | Out-Null
+git clone https://github.com/Way-To-AGI/codex-theme-studio.git (Join-Path $skillRoot "codex-theme-studio")
+```
+
 重启 Codex 后即可在 Skills 列表中看到该技能。
 
-需要从 Finder 快速打开可视化主题库时，运行 `scripts/choose-theme.command`，也可以在桌面放置一个指向它的包装脚本。若 Codex 尚未开启回环 CDP，命令会先询问是否执行一次安全重启。
+需要从桌面快速打开可视化主题库时，macOS 运行 `scripts/choose-theme.command`，Windows 运行 `scripts\choose-theme.cmd`。若 Codex 尚未开启回环 CDP，入口会先询问是否执行一次安全重启。
 
 后续更新：
 
@@ -116,6 +126,12 @@ node scripts/compile-theme.mjs \
 node scripts/start-theme.mjs --theme aurora-focus
 ```
 
+Windows 会依次检查正在运行的官方进程、常见安装位置和已注册 AppX 包。自动发现失败时，可显式指定带有效 OpenAI 签名的程序：
+
+```powershell
+node scripts/theme.mjs use aurora-focus --app-path "$env:LOCALAPPDATA\Programs\ChatGPT\ChatGPT.exe"
+```
+
 如果 Codex 已经在未开启回环 CDP 的情况下运行，启动器会安全停止。可以先关闭 Codex，或者明确授权重启：
 
 ```bash
@@ -173,6 +189,7 @@ node scripts/import-theme.mjs --input /absolute/path/theme.codex-theme
 node scripts/self-test.mjs
 node scripts/studio-protocol-test.mjs
 node scripts/theme-control-test.mjs
+node scripts/platform-runtime-test.mjs
 ```
 
 安装为 Codex Skill 后，还可以执行：

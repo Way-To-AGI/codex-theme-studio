@@ -25,16 +25,18 @@ An interactive Codex Skill for designing, generating, previewing, applying, vali
 
 ## Requirements
 
-- macOS 12 or later.
-- Official Codex desktop app installed as `/Applications/ChatGPT.app` or `~/Applications/ChatGPT.app`.
+- macOS 12 or later, or Windows 10/11.
+- Official Codex desktop app: `ChatGPT.app` on macOS, or an OpenAI-signed `ChatGPT.exe` / `Codex.exe` on Windows.
 - Node.js 22 or later.
 - Codex with local Skills support.
 
-The current launcher and restore workflow target macOS. The compiler, package validation, HTML studio, and tests are platform-neutral; Windows launch integration is not included yet.
+The launcher discovers the signed official app without modifying its bundle, `WindowsApps`, or `app.asar`. Windows state is stored under `%LOCALAPPDATA%\CodexThemeStudio` with a private user ACL.
 
 ## Install
 
 Clone the repository directly into the Codex Skills directory:
+
+macOS:
 
 ```bash
 mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
@@ -42,9 +44,17 @@ git clone https://github.com/Way-To-AGI/codex-theme-studio.git \
   "${CODEX_HOME:-$HOME/.codex}/skills/codex-theme-studio"
 ```
 
+Windows PowerShell:
+
+```powershell
+$skillRoot = Join-Path $env:USERPROFILE ".codex\skills"
+New-Item -ItemType Directory -Force $skillRoot | Out-Null
+git clone https://github.com/Way-To-AGI/codex-theme-studio.git (Join-Path $skillRoot "codex-theme-studio")
+```
+
 Restart Codex so the Skill appears in the Skills list.
 
-For a Finder-friendly visual library, run `scripts/choose-theme.command` or place a small wrapper on the Desktop. The command asks before the one-time Codex restart if loopback CDP is not active.
+For a desktop-friendly visual library, run `scripts/choose-theme.command` on macOS or `scripts\choose-theme.cmd` on Windows. Both ask before the one-time Codex restart if loopback CDP is not active.
 
 Update later with:
 
@@ -116,6 +126,12 @@ Apply a theme:
 node scripts/start-theme.mjs --theme aurora-focus
 ```
 
+On Windows, automatic discovery checks running official processes, common install locations, and registered AppX packages. If discovery is unavailable, provide the signed executable explicitly:
+
+```powershell
+node scripts/theme.mjs use aurora-focus --app-path "$env:LOCALAPPDATA\Programs\ChatGPT\ChatGPT.exe"
+```
+
 If Codex is already running without the loopback CDP port, the launcher stops safely. Close Codex first, or explicitly authorize a restart:
 
 ```bash
@@ -173,6 +189,7 @@ Replacing an existing theme requires the explicit `--force` flag.
 node scripts/self-test.mjs
 node scripts/studio-protocol-test.mjs
 node scripts/theme-control-test.mjs
+node scripts/platform-runtime-test.mjs
 ```
 
 When installed as a Codex Skill, also run:

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listThemes, loadTheme } from "./theme-core.mjs";
 import { startThemeControl } from "./theme-control-server.mjs";
+import { securePrivateFile, statePathFor } from "./platform-runtime.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -219,7 +219,7 @@ async function capture(session, output) {
 function isAuxiliaryTarget(target) {
   try {
     const route = new URL(target.url).searchParams.get("initialRoute") ?? "";
-    return route === "/hotkey-window" || route.startsWith("/overlay") || route.startsWith("/diagnostic");
+    return route === "/hotkey-window" || route === "/avatar-overlay" || route.startsWith("/overlay") || route.startsWith("/diagnostic");
   } catch { return false; }
 }
 
@@ -258,7 +258,7 @@ async function runWatch(options) {
   const sessions = new Map();
   let stopping = false;
   let queue = Promise.resolve();
-  const statePath = options.statePath ?? path.join(os.homedir(), "Library", "Application Support", "CodexThemeStudio", "state.json");
+  const statePath = options.statePath ?? statePathFor();
   const control = options.controlPort && options.controlToken ? { port: options.controlPort, token: options.controlToken } : null;
   const switcherExpression = await managerExpression(control);
   const enqueue = (operation) => { const next = queue.then(operation, operation); queue = next.catch(() => {}); return next; };
@@ -271,7 +271,7 @@ async function runWatch(options) {
     const temporary = `${statePath}.${process.pid}.tmp`;
     await fs.mkdir(path.dirname(statePath), { recursive: true });
     await fs.writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, "utf8");
-    await fs.chmod(temporary, 0o600);
+    await securePrivateFile(temporary);
     await fs.rename(temporary, statePath);
   };
   const applyCurrent = async (session) => {
@@ -280,6 +280,7 @@ async function runWatch(options) {
   };
   const verifyCurrent = async () => {
     if (!payload) return true;
+    if (!sessions.size) throw new Error("No Codex renderer is connected to Theme Studio CDP");
     for (const [id, session] of sessions) {
       const target = { id, url: session.target.url };
       const result = await session.evaluate(verifyExpression(payload.theme, isAuxiliaryTarget(target)));
@@ -295,6 +296,7 @@ async function runWatch(options) {
       ...control,
       listThemes,
       currentTheme: () => payload?.theme?.id ?? null,
+      runtimeReady: () => sessions.size > 0,
       readArtwork: async (id) => {
         const theme = await loadTheme(id);
         if (!theme.artPath) return null;
