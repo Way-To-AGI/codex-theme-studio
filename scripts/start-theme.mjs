@@ -39,11 +39,14 @@ async function cdpReady(port) {
   } catch { return false; }
 }
 
-function stopPreviousWatcher(state) {
+async function stopPreviousWatcher(state) {
   if (!state?.watcherPid) return;
   const command = commandFor(state.watcherPid);
   if (command.includes(runtimePath) && command.includes("--watch")) {
     try { process.kill(state.watcherPid, "SIGTERM"); } catch { /* stale */ }
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && commandFor(state.watcherPid).includes(runtimePath)) await new Promise((resolve) => setTimeout(resolve, 100));
+    if (commandFor(state.watcherPid).includes(runtimePath)) throw new Error("Previous Theme Studio watcher did not stop cleanly");
   }
 }
 
@@ -98,7 +101,7 @@ console.log(JSON.stringify({
 await securePrivateDirectory(stateRoot);
 let previousState = null;
 try { previousState = JSON.parse(await fs.readFile(statePath, "utf8")); } catch { /* first run */ }
-stopPreviousWatcher(previousState);
+await stopPreviousWatcher(previousState);
 
 if (!(await cdpReady(options.port))) {
   await assertLoopbackPortAvailable(options.port);
