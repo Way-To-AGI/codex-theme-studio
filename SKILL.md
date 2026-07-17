@@ -1,6 +1,6 @@
 ---
 name: codex-theme-studio
-description: Interactively design, generate, preview, apply, verify, export, repair, or safely remove polished decorative themes for the official Codex desktop app on macOS. Use when a user wants a guided HTML theme studio, a custom Codex skin from a brief or reference image, a background image, coordinated colors, safe non-blocking decorations, a portable .codex-theme package, live compatibility inspection, or one-click restoration without modifying ChatGPT.app or app.asar.
+description: Interactively design, generate, preview, apply, hot-switch, verify, export, repair, or safely remove polished decorative themes for the official Codex desktop app on macOS. Use when a user wants a guided HTML theme studio, visual theme library, in-app theme picker, command-line theme switching, custom Codex skin from a brief or reference image, background image, coordinated colors, safe non-blocking decorations, portable .codex-theme package, live compatibility inspection, or one-click restoration without modifying ChatGPT.app or app.asar.
 ---
 
 # Codex Theme Studio
@@ -17,6 +17,16 @@ Create reversible Codex themes through a constrained design brief and loopback C
 - Export with `node scripts/export-theme.mjs --theme <id-or-manifest> --output /absolute/theme.codex-theme`.
 - Import an untrusted package with `node scripts/import-theme.mjs --input /absolute/theme.codex-theme`; replacement requires `--force`.
 - Restore with `node scripts/restore-theme.mjs`; add `--restore-base-theme` only if an earlier workflow changed official base settings.
+- Open the visual theme library with `node scripts/theme.mjs web`; use the in-app `◐` button after the manager starts, or use `node scripts/theme.mjs list|status|use|native|restore|studio` from a terminal.
+
+## Quick switching
+
+- Treat the web library, trusted in-app `◐` control, and CLI as three clients of the same loopback manager. Never implement separate active-theme state for an entry point.
+- Discover only validated `themes/<id>/<id>.json` manifests. A newly installed valid theme must appear without script changes.
+- Use `node scripts/theme.mjs use <id>` for normal switching. It hot-switches through the running manager and starts the manager only when necessary.
+- Use `native` to remove theme paint while keeping the manager and `◐` available. Use `restore` for a complete cleanup that also removes the manager control and watcher.
+- The first activation may require an explicitly authorized Codex restart to enable loopback CDP. Never add `--restart-existing` without that authorization; later switching is live.
+- Keep the in-app switcher separate from theme decorations. It may receive pointer events only inside its own trusted button and panel, must avoid native controls, and must hide in dialogs and compact windows.
 
 Read `references/theme-schema.md` before changing the brief or manifest. Read `references/design-system.md` before editing generated CSS. Read `references/runtime-notes.md` before changing launch, CDP, persistence, or restore behavior. Read `references/qa-inventory.md` before declaring completion.
 
@@ -87,5 +97,6 @@ Run:
 ```bash
 node scripts/self-test.mjs
 node scripts/studio-protocol-test.mjs
+node scripts/theme-control-test.mjs
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" .
 ```

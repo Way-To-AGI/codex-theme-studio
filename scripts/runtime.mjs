@@ -1,17 +1,22 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadTheme } from "./theme-core.mjs";
+import { listThemes, loadTheme } from "./theme-core.mjs";
+import { startThemeControl } from "./theme-control-server.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 
 function parseArgs(argv) {
-  const options = { port: 9335, mode: "watch", timeoutMs: 30000, screenshot: null, theme: null };
+  const options = { port: 9335, controlPort: null, controlToken: null, statePath: null, mode: "watch", timeoutMs: 30000, screenshot: null, theme: null };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--port") options.port = Number(argv[++index]);
+    else if (arg === "--control-port") options.controlPort = Number(argv[++index]);
+    else if (arg === "--control-token") options.controlToken = argv[++index];
+    else if (arg === "--state-path") options.statePath = path.resolve(argv[++index]);
     else if (arg === "--watch") options.mode = "watch";
     else if (arg === "--once") options.mode = "once";
     else if (arg === "--verify") options.mode = "verify";
@@ -23,6 +28,8 @@ function parseArgs(argv) {
     else throw new Error(`Unknown argument: ${arg}`);
   }
   if (!Number.isInteger(options.port) || options.port < 1024 || options.port > 65535) throw new Error("Invalid CDP port");
+  if (options.controlPort !== null && (!Number.isInteger(options.controlPort) || options.controlPort < 1024 || options.controlPort > 65535)) throw new Error("Invalid control port");
+  if ((options.controlPort === null) !== (options.controlToken === null)) throw new Error("Control port and token must be supplied together");
   if (options.mode !== "remove" && !options.theme) throw new Error("--theme is required");
   return options;
 }
@@ -147,15 +154,28 @@ const removeExpression = `(() => {
   return true;
 })()`;
 
+const removeManagerExpression = `(() => window.__CODEX_THEME_STUDIO_SWITCHER_STATE__?.cleanup?.() ?? true)()`;
+
+async function managerExpression(control) {
+  if (!control) return null;
+  const template = await fs.readFile(path.join(root, "assets", "theme-switcher.js"), "utf8");
+  return template.replace("__CTS_CONTROL_JSON__", JSON.stringify(control));
+}
+
 const verifyExpression = (expected, smoke) => `(() => {
   const rect = (node) => { if (!node) return null; const r = node.getBoundingClientRect(); return { left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height }; };
   const visible = (value) => Boolean(value && value.width > 0 && value.height > 0);
   const overlap = (a,b) => a && b && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
   const decorations = document.getElementById('codex-theme-studio-decorations');
+  const switcher = document.getElementById('codex-theme-studio-switcher');
+  const switcherButton = switcher?.querySelector('.cts-switch-button');
   const cards = decorations ? [...decorations.querySelectorAll('.cts-decoration-card:not([hidden])')] : [];
   const controls = [...document.querySelectorAll('button,a[href],input,textarea,select,[contenteditable="true"],[role="button"],[role="link"],[role="menuitem"],[role="option"],[role="tab"]')]
     .filter(node => !node.closest('#codex-theme-studio-decorations')).map(rect).filter(visible);
   const collisions = cards.flatMap(card => controls.filter(control => overlap(rect(card), control))).length;
+  const switcherRect = switcher && !switcher.hidden ? rect(switcher) : null;
+  const switcherCollisions = switcherRect ? [...document.querySelectorAll('button,a[href],input,textarea,select,[contenteditable="true"],[role="button"],[role="link"]')]
+    .filter(node => !switcher.contains(node) && !node.closest('#codex-theme-studio-decorations')).map(rect).filter(visible).filter(control => overlap(switcherRect, control)).length : 0;
   const home = document.querySelector('[role="main"]:has([data-testid="home-icon"])');
   const composer = document.querySelector('.composer-surface-chrome');
   const sidebar = document.querySelector('aside.app-shell-left-panel');
@@ -172,6 +192,8 @@ const verifyExpression = (expected, smoke) => `(() => {
     visibleDecorations: cards.map(card => ({ slot: card.dataset.slot || null, rect: rect(card) })),
     hiddenDecorations: decorations ? [...decorations.querySelectorAll('.cts-decoration-card[hidden]')].map(card => ({ slot: card.dataset.slot || null, reason: card.dataset.hiddenReason || null })) : [],
     decorationCollisions: collisions,
+    switcherPresent: Boolean(switcher), switcherBodySibling: switcher?.parentElement === document.body,
+    switcherButtonLabel: switcherButton?.getAttribute('aria-label') || null, switcherCollisions,
     main: rect(main), sidebar: rect(sidebar), composer: rect(composer), home: Boolean(home),
     nativeControls: controls.length,
     horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -181,7 +203,8 @@ const verifyExpression = (expected, smoke) => `(() => {
   const strictSurface = ${smoke ? "true" : "visible(result.main) && (!result.home || visible(result.composer)) && (!result.sidebar || visible(result.sidebar)) && result.nativeControls >= 5"};
   result.pass = result.installed && result.themeId === expected.id && result.version === expected.version && result.stylePresent &&
     result.decorationsPresent && result.decorationsAriaHidden && result.decorationsPointerEvents === 'none' && result.decorationsBodySibling &&
-    result.decorationCollisions === 0 && !result.horizontalOverflow && strictSurface;
+    result.decorationCollisions === 0 && result.switcherPresent && result.switcherBodySibling && result.switcherButtonLabel &&
+    result.switcherCollisions === 0 && !result.horizontalOverflow && strictSurface;
   return result;
 })()`;
 
@@ -213,7 +236,7 @@ async function runOneShot(options) {
   for (const target of targets) {
     const session = await new CdpSession(target, Math.min(options.timeoutMs, 10000)).open();
     try {
-      if (options.mode === "remove") await session.evaluate(removeExpression);
+      if (options.mode === "remove") { await session.evaluate(removeExpression); await session.evaluate(removeManagerExpression); }
       else if (options.mode === "once") { await apply(session, payload); await new Promise((resolve) => setTimeout(resolve, 500)); }
       const result = options.mode === "remove"
         ? await session.evaluate("!document.documentElement.classList.contains('codex-theme-studio-skin')")
@@ -231,11 +254,85 @@ async function runOneShot(options) {
 }
 
 async function runWatch(options) {
-  const payload = await loadPayload(options.theme);
+  let payload = await loadPayload(options.theme);
   const sessions = new Map();
   let stopping = false;
+  let queue = Promise.resolve();
+  const statePath = options.statePath ?? path.join(os.homedir(), "Library", "Application Support", "CodexThemeStudio", "state.json");
+  const control = options.controlPort && options.controlToken ? { port: options.controlPort, token: options.controlToken } : null;
+  const switcherExpression = await managerExpression(control);
+  const enqueue = (operation) => { const next = queue.then(operation, operation); queue = next.catch(() => {}); return next; };
+  const saveActive = async (nextPayload) => {
+    let state = {};
+    try { state = JSON.parse(await fs.readFile(statePath, "utf8")); } catch { /* initialize */ }
+    state.theme = nextPayload?.theme?.id ? (await loadTheme(nextPayload.theme.id)).manifestPath : null;
+    state.activeTheme = nextPayload?.theme?.id ?? null;
+    state.updatedAt = new Date().toISOString();
+    const temporary = `${statePath}.${process.pid}.tmp`;
+    await fs.mkdir(path.dirname(statePath), { recursive: true });
+    await fs.writeFile(temporary, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    await fs.chmod(temporary, 0o600);
+    await fs.rename(temporary, statePath);
+  };
+  const applyCurrent = async (session) => {
+    if (payload) await apply(session, payload); else await session.evaluate(removeExpression);
+    if (switcherExpression) await session.evaluate(switcherExpression);
+  };
+  const verifyCurrent = async () => {
+    if (!payload) return true;
+    for (const [id, session] of sessions) {
+      const target = { id, url: session.target.url };
+      const result = await session.evaluate(verifyExpression(payload.theme, isAuxiliaryTarget(target)));
+      if (!result.pass) throw new Error(`Live verification failed for renderer ${id}`);
+    }
+    return true;
+  };
   process.on("SIGINT", () => { stopping = true; });
   process.on("SIGTERM", () => { stopping = true; });
+  let controlServer = null;
+  if (control) {
+    controlServer = await startThemeControl({
+      ...control,
+      listThemes,
+      currentTheme: () => payload?.theme?.id ?? null,
+      readArtwork: async (id) => {
+        const theme = await loadTheme(id);
+        if (!theme.artPath) return null;
+        return { mimeType: mimeType(theme.artPath), data: await fs.readFile(theme.artPath) };
+      },
+      switchTheme: (themeId) => enqueue(async () => {
+        const previous = payload;
+        const candidate = await loadPayload(themeId);
+        try {
+          payload = candidate;
+          await Promise.all([...sessions.values()].map(applyCurrent));
+          await verifyCurrent();
+          await saveActive(payload);
+          return { activeTheme: payload.theme.id, themes: await listThemes(), designedFor: (await loadTheme(themeId)).manifest.appearance?.designedFor ?? "light" };
+        } catch (error) {
+          payload = previous;
+          await Promise.allSettled([...sessions.values()].map(applyCurrent));
+          throw new Error(`Theme switch rolled back: ${error.message}`);
+        }
+      }),
+      nativeTheme: () => enqueue(async () => {
+        const previous = payload;
+        try {
+          payload = null;
+          await Promise.all([...sessions.values()].map(applyCurrent));
+          await saveActive(null);
+          return { activeTheme: null, themes: await listThemes(), native: true };
+        } catch (error) { payload = previous; await Promise.allSettled([...sessions.values()].map(applyCurrent)); throw error; }
+      }),
+      shutdownTheme: () => enqueue(async () => {
+        payload = null;
+        await Promise.allSettled([...sessions.values()].map(async (session) => { await session.evaluate(removeExpression); await session.evaluate(removeManagerExpression); }));
+        await fs.rm(statePath, { force: true });
+        stopping = true;
+        return { restored: true, stopped: true };
+      }),
+    });
+  }
   while (!stopping) {
     let targets = [];
     try { targets = await waitForTargets(options.port, 1800); }
@@ -248,14 +345,15 @@ async function runWatch(options) {
       if (sessions.has(target.id)) continue;
       try {
         const session = await new CdpSession(target, 10000).open();
-        session.on("Page.loadEventFired", () => setTimeout(() => apply(session, payload).catch((error) => console.error(error.message)), 250));
-        await apply(session, payload);
+        session.on("Page.loadEventFired", () => setTimeout(() => applyCurrent(session).catch((error) => console.error(error.message)), 250));
+        await applyCurrent(session);
         sessions.set(target.id, session);
       } catch (error) { console.error(`[theme-studio] inject failed: ${error.message}`); }
     }
     await new Promise((resolve) => setTimeout(resolve, 650));
   }
   for (const session of sessions.values()) session.close();
+  controlServer?.server.close();
 }
 
 const options = parseArgs(process.argv.slice(2));

@@ -506,6 +506,30 @@ export async function loadTheme(reference) {
   return { manifest, manifestPath, cssPath, css, artPath };
 }
 
+export async function listThemes() {
+  let entries = [];
+  try { entries = await fs.readdir(themesRoot, { withFileTypes: true }); }
+  catch (error) { if (error.code !== "ENOENT") throw error; }
+  const themes = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !SAFE_ID.test(entry.name)) continue;
+    try {
+      const theme = await loadTheme(entry.name);
+      if (theme.manifest.id !== entry.name) continue;
+      themes.push({
+        id: theme.manifest.id,
+        displayName: theme.manifest.displayName,
+        version: theme.manifest.version,
+        designedFor: theme.manifest.appearance?.designedFor ?? theme.manifest.design?.mode ?? "light",
+        quality: theme.manifest.quality ?? null,
+        palette: theme.manifest.design?.palette ?? theme.manifest.baseTheme?.palette ?? null,
+        hasArt: Boolean(theme.artPath),
+      });
+    } catch { /* Invalid themes stay out of every trusted selector. */ }
+  }
+  return themes.sort((a, b) => a.displayName.localeCompare(b.displayName));
+}
+
 function mimeType(filename) {
   const extension = path.extname(filename).toLowerCase();
   if (extension === ".jpg" || extension === ".jpeg") return "image/jpeg";

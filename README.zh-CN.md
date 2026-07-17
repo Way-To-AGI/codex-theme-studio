@@ -20,6 +20,8 @@
 - 使用本地回环 CDP 可逆注入，不修改签名应用和 `app.asar`。
 - 支持 `.codex-theme` 导入导出，并检查大小、路径和 CSS 安全性。
 - 内置 `aurora-focus` 与深色迪迦 `tiga-light` 示例主题和背景图。
+- 提供三种同步快捷切换入口：可视化网页主题库、软件内自动避让的 `◐` 选择器和命令行。
+- 首次激活回环运行时后即可免重启热切换，并串行执行、失败自动回滚。
 
 ## 环境要求
 
@@ -41,6 +43,8 @@ git clone https://github.com/Way-To-AGI/codex-theme-studio.git \
 ```
 
 重启 Codex 后即可在 Skills 列表中看到该技能。
+
+需要从 Finder 快速打开可视化主题库时，运行 `scripts/choose-theme.command`，也可以在桌面放置一个指向它的包装脚本。若 Codex 尚未开启回环 CDP，命令会先询问是否执行一次安全重启。
 
 后续更新：
 
@@ -77,6 +81,20 @@ node scripts/studio-server.mjs --wait-for-submit
 如果需要 AI 背景图，Codex 会生成宽屏位图，让中央阅读列和输入框后方保持安静留白，然后使用 `--art` 编译主题。
 
 ## 命令行流程
+
+快捷切换命令：
+
+```bash
+node scripts/theme.mjs list
+node scripts/theme.mjs status
+node scripts/theme.mjs use aurora-focus
+node scripts/theme.mjs web
+node scripts/theme.mjs native
+node scripts/theme.mjs restore
+node scripts/theme.mjs studio
+```
+
+网页主题库、软件内 `◐` 和这些命令共用同一个回环管理器及当前主题状态。`native` 只清除主题外观，保留快速切换能力；`restore` 会同时移除主题、软件内按钮、管理器和 watcher。
 
 应用前检查推荐模式和配色质量：
 
@@ -153,6 +171,8 @@ node scripts/import-theme.mjs --input /absolute/path/theme.codex-theme
 
 ```bash
 node scripts/self-test.mjs
+node scripts/studio-protocol-test.mjs
+node scripts/theme-control-test.mjs
 ```
 
 安装为 Codex Skill 后，还可以执行：
@@ -168,9 +188,11 @@ python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_
 SKILL.md                 Agent 工作流与安全边界
 agents/openai.yaml       Codex Skill 元数据
 assets/studio/           交互式 HTML 工作台
+assets/switcher/         可视化主题库
 assets/renderer-inject.js 安全渲染适配器
+assets/theme-switcher.js 软件内受信任主题选择器
 references/              Schema、设计规范、运行时和 QA 契约
-scripts/                 编译、运行、导入导出、恢复和测试脚本
+scripts/                 编译、运行、快捷切换、恢复和测试脚本
 themes/aurora-focus/     内置示例主题
 ```
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs/promises";
+import crypto from "node:crypto";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
@@ -79,6 +81,17 @@ function runRuntime(args, options = {}) {
   return spawn(process.execPath, [runtimePath, ...args], { stdio: options.stdio ?? "inherit", detached: options.detached ?? false });
 }
 
+async function freeLoopbackPort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const port = server.address().port;
+      server.close((error) => error ? reject(error) : resolve(port));
+    });
+  });
+}
+
 const options = parseArgs(process.argv.slice(2));
 const theme = await loadTheme(options.theme);
 const appearance = theme.manifest.appearance ?? {
@@ -120,23 +133,32 @@ if (!(await cdpReady(options.port))) {
   await waitReady(options.port);
 }
 
+const controlPort = await freeLoopbackPort();
+const controlToken = crypto.randomBytes(32).toString("hex");
+const controlArgs = ["--control-port", String(controlPort), "--control-token", controlToken, "--state-path", statePath];
+
 if (options.foreground) {
-  const child = runRuntime(["--watch", "--port", String(options.port), "--theme", theme.manifestPath]);
+  const child = runRuntime(["--watch", "--port", String(options.port), "--theme", theme.manifestPath, ...controlArgs]);
   await new Promise((resolve) => child.on("exit", resolve));
   process.exit(0);
 }
 
 const out = await fs.open(path.join(stateRoot, "watcher.log"), "a");
 const err = await fs.open(path.join(stateRoot, "watcher-error.log"), "a");
-const watcher = runRuntime(["--watch", "--port", String(options.port), "--theme", theme.manifestPath], { detached: true, stdio: ["ignore", out.fd, err.fd] });
+const watcher = runRuntime(["--watch", "--port", String(options.port), "--theme", theme.manifestPath, ...controlArgs], { detached: true, stdio: ["ignore", out.fd, err.fd] });
 watcher.unref();
 await fs.writeFile(statePath, `${JSON.stringify({
   port: options.port,
   watcherPid: watcher.pid,
   theme: theme.manifestPath,
+  activeTheme: theme.manifest.id,
+  controlPort,
+  controlToken,
+  managerUrl: `http://127.0.0.1:${controlPort}/#${controlToken}`,
   profilePath: options.profilePath,
   startedAt: new Date().toISOString(),
 }, null, 2)}\n`, "utf8");
+await fs.chmod(statePath, 0o600);
 
 let verified = false;
 const verifyMode = options.profilePath ? "--smoke" : "--verify";
@@ -160,4 +182,4 @@ if (options.screenshot) {
   }
   if (!captured) console.warn(`Theme is active, but screenshot capture did not complete: ${options.screenshot}`);
 }
-console.log(JSON.stringify({ active: true, theme: theme.manifest.id, designedFor: appearance.designedFor, quality: theme.manifest.quality ?? null, port: options.port, watcherPid: watcher.pid, screenshot: options.screenshot }, null, 2));
+console.log(JSON.stringify({ active: true, theme: theme.manifest.id, designedFor: appearance.designedFor, quality: theme.manifest.quality ?? null, port: options.port, watcherPid: watcher.pid, controlPort, webCommand: "node scripts/theme.mjs web", screenshot: options.screenshot }, null, 2));

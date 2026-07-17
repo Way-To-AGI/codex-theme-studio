@@ -18,6 +18,10 @@
 - Dialogs and compact windows hide decorations.
 - Route changes and reloads retain the theme.
 - Restore removes the marker, stylesheet, artwork URL, observer, timer, listeners, and decoration nodes.
+- Web, in-app, and CLI clients report the same active theme and can hot-switch twice without restarting Codex.
+- The in-app switcher is a body sibling with an accessible label, overlaps zero native controls, and hides in dialogs and compact windows.
+- Native mode keeps only the trusted manager control; full restore removes both the theme and manager.
+- A failed or unknown theme switch leaves the previous verified theme active.
 
 ## Visual
 

@@ -20,6 +20,8 @@ An interactive Codex Skill for designing, generating, previewing, applying, vali
 - Reversible loopback CDP injection; the signed app bundle and `app.asar` are never modified.
 - Portable `.codex-theme` import/export with size, path, and CSS safety validation.
 - Bundled `aurora-focus` and dark Tiga `tiga-light` sample themes with artwork.
+- Three synchronized quick-switch clients: a visual web library, a collision-aware in-app `◐` picker, and a CLI.
+- Live switching without restarting Codex after the one-time loopback runtime activation, with serialized changes and automatic rollback.
 
 ## Requirements
 
@@ -41,6 +43,8 @@ git clone https://github.com/Way-To-AGI/codex-theme-studio.git \
 ```
 
 Restart Codex so the Skill appears in the Skills list.
+
+For a Finder-friendly visual library, run `scripts/choose-theme.command` or place a small wrapper on the Desktop. The command asks before the one-time Codex restart if loopback CDP is not active.
 
 Update later with:
 
@@ -77,6 +81,20 @@ Use $codex-theme-studio to create a calm light theme with a misty mountain backg
 When AI artwork is requested, Codex should generate a wide bitmap with quiet negative space behind the central reading column and composer, save it locally, then compile it with `--art`.
 
 ## CLI workflow
+
+Quick-switch commands:
+
+```bash
+node scripts/theme.mjs list
+node scripts/theme.mjs status
+node scripts/theme.mjs use aurora-focus
+node scripts/theme.mjs web
+node scripts/theme.mjs native
+node scripts/theme.mjs restore
+node scripts/theme.mjs studio
+```
+
+The visual library, the in-app `◐` picker, and these commands share one loopback manager and one active-theme state. `native` removes theme paint but keeps quick switching available. `restore` removes the theme, in-app control, manager, and watcher.
 
 Inspect the recommended appearance and palette quality before applying:
 
@@ -153,6 +171,8 @@ Replacing an existing theme requires the explicit `--force` flag.
 
 ```bash
 node scripts/self-test.mjs
+node scripts/studio-protocol-test.mjs
+node scripts/theme-control-test.mjs
 ```
 
 When installed as a Codex Skill, also run:
@@ -168,9 +188,11 @@ python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_
 SKILL.md                 Agent workflow and guardrails
 agents/openai.yaml       Codex Skill metadata
 assets/studio/           Interactive HTML studio
+assets/switcher/         Visual theme library
 assets/renderer-inject.js Safe renderer adapter
+assets/theme-switcher.js Trusted in-app theme picker
 references/              Schema, design system, runtime, and QA contracts
-scripts/                 Compiler, runtime, import/export, restore, and tests
+scripts/                 Compiler, runtime, quick-switch clients, restore, and tests
 themes/aurora-focus/     Bundled sample theme
 ```
 
