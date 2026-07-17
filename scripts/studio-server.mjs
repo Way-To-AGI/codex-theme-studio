@@ -157,6 +157,8 @@ const server = http.createServer(async (request, response) => {
         briefPath,
         themeId: brief.id,
         backgroundMode: brief.background.source,
+        designedFor: brief.appearance.designedFor,
+        qualityScore: brief.quality.score,
         ...(artPath ? { artPath } : {}),
       };
       console.log(JSON.stringify(event));

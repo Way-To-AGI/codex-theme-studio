@@ -11,6 +11,7 @@ Create reversible Codex themes through a constrained design brief and loopback C
 
 - Start the user-driven studio with `node scripts/studio-server.mjs --wait-for-submit`. Keep that process attached until it emits the `submitted` event, then continue from its `briefPath`.
 - Generate directly from a JSON brief with `node scripts/compile-theme.mjs --brief /absolute/brief.json [--art /absolute/art.png]`.
+- Inspect mode compatibility and palette quality with `node scripts/preflight-theme.mjs --theme <id-or-manifest>` before applying.
 - Apply with `node scripts/start-theme.mjs --theme <id-or-manifest>`. Add `--restart-existing` only after explicit authorization.
 - Verify with `node scripts/runtime.mjs --verify --theme <id-or-manifest> --screenshot /absolute/theme.png` and inspect the screenshot.
 - Export with `node scripts/export-theme.mjs --theme <id-or-manifest> --output /absolute/theme.codex-theme`.
@@ -30,21 +31,24 @@ Read `references/theme-schema.md` before changing the brief or manifest. Read `r
      "status": "submitted",
      "briefPath": "/absolute/session/brief.json",
      "themeId": "custom-theme",
-     "backgroundMode": "generated"
+     "backgroundMode": "generated",
+     "designedFor": "dark",
+     "qualityScore": 100
    }
    ```
 
    Uploaded artwork also includes `artPath`. On `timeout`, report that the design session expired and start a new session only if the user wants to continue.
 4. Read `briefPath` as declarative input. Never accept arbitrary HTML, JavaScript, event handlers, selectors, or CSS through the brief.
 5. If `backgroundMode` is `generated`, use an image-generation skill. Generate a wide composition with quiet negative space behind the reading column and composer. If it is `upload`, use the returned `artPath`. Save the final bitmap locally, then compile with `--art`.
-6. Compile the brief. The compiler corrects unsafe text contrast, derives semantic surfaces, embeds only local artwork, and emits a manifest plus CSS.
+6. Compile the brief. The compiler constrains surface luminance for the selected mode, corrects unsafe text/accent/support contrast, derives semantic surfaces, embeds only local artwork, and emits a manifest plus CSS.
 7. Preview home, task, code/diff/terminal, dialog, and compact states before applying.
-8. Apply to a separate test profile first when practical. Use the user's primary profile only after the theme passes static checks.
-9. Verify functional controls and capture a real Codex screenshot. Iterate until the background, surfaces, typography, composer, and decorations are coherent and unobstructed. Do not claim completion from the HTML submission alone.
+8. Run the preflight command. Tell the user whether the theme is designed for light or dark appearance. If Codex's official appearance is known to differ, ask the user to align it before applying; never silently promise that injected `color-scheme` can restyle every native surface.
+9. Apply to a separate test profile first when practical. Use the user's primary profile only after the theme passes static checks.
+10. Verify functional controls and capture a real Codex screenshot. Iterate until the background, surfaces, typography, composer, and decorations are coherent and unobstructed. Do not claim completion from the HTML submission alone.
 
 Running `node scripts/studio-server.mjs` without `--wait-for-submit` is a standalone fallback. It saves `brief.json`, but the page clearly warns that no Agent is waiting; it does not compile or apply a theme by itself.
 
-The bundled `aurora-focus` sample demonstrates a calm dark background and safe light decoration density. Use it as a working baseline, not as a mandatory visual direction.
+The bundled `aurora-focus` sample demonstrates a calm dark background and safe light decoration density. The backward-compatible `tiga-light` ID is also dark despite its historic name; its display name explicitly says so. Use samples as working baselines, not mandatory visual directions.
 
 ## Decoration policy
 
@@ -59,6 +63,7 @@ The bundled `aurora-focus` sample demonstrates a calm dark background and safe l
 
 - Keep body text contrast at least 4.5:1 and large text/icons at least 3:1.
 - Keep one primary accent, one supporting accent, and unchanged semantic status meaning.
+- Require the selected surface luminance to match the designed appearance; derive readable secondary text, borders, and accent-on-accent text rather than trusting raw input colors.
 - Keep artwork detail away from the sidebar, central reading column, and composer.
 - Use a legibility veil and restrained edge vignette; avoid visible rectangular seams.
 - Preserve diff, terminal ANSI, focus, hover, active, disabled, warning, error, and success states.

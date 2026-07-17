@@ -11,13 +11,15 @@ An interactive Codex Skill for designing, generating, previewing, applying, vali
 - Guided four-step HTML theme studio instead of a long configuration form.
 - Light and dark modes with curated editorial, aurora, cyber, and warm directions.
 - Coordinated semantic colors, typography, radius, border, shadow, and surface treatments.
+- Semantic palette scoring with automatic correction for mode-incompatible surfaces, text, accents, and supporting colors.
+- An explicit light/dark Codex appearance reminder before applying, preventing mixed native surfaces.
 - Local PNG, JPEG, or WebP background artwork with a legibility veil and focal-position control.
 - Optional AI-art workflow: the studio records a background prompt, and Codex can generate and bundle the final bitmap.
 - Trusted, pointer-inert decoration templates with live collision detection.
 - Automatic hiding on dialogs, compact windows, missing anchors, or unsafe space.
 - Reversible loopback CDP injection; the signed app bundle and `app.asar` are never modified.
 - Portable `.codex-theme` import/export with size, path, and CSS safety validation.
-- Bundled `aurora-focus` sample theme and artwork.
+- Bundled `aurora-focus` and dark Tiga `tiga-light` sample themes with artwork.
 
 ## Requirements
 
@@ -75,6 +77,12 @@ Use $codex-theme-studio to create a calm light theme with a misty mountain backg
 When AI artwork is requested, Codex should generate a wide bitmap with quiet negative space behind the central reading column and composer, save it locally, then compile it with `--art`.
 
 ## CLI workflow
+
+Inspect the recommended appearance and palette quality before applying:
+
+```bash
+node scripts/preflight-theme.mjs --theme aurora-focus
+```
 
 Compile a JSON brief:
 

@@ -94,10 +94,15 @@ async function runSession(backgroundMode, artDataUrl = null, checkSecurity = fal
   assert.deepEqual(stdoutEvent, responseEvent);
   assert.equal(responseEvent.themeId, brief.id);
   assert.equal(responseEvent.backgroundMode, backgroundMode);
+  assert.equal(responseEvent.designedFor, "dark");
+  assert.equal(responseEvent.qualityScore, 100);
   assert.equal(path.basename(responseEvent.briefPath), "brief.json");
   const saved = JSON.parse(await fs.readFile(responseEvent.briefPath, "utf8"));
   assert.equal(saved.id, brief.id);
   assert.equal(saved.background.source, backgroundMode);
+  assert.equal(saved.appearance.designedFor, "dark");
+  assert.equal(saved.quality.grade, "excellent");
+  assert.ok(saved.quality.checks.every((check) => check.pass));
   if (artDataUrl) {
     assert.ok(responseEvent.artPath);
     assert.ok((await fs.stat(responseEvent.artPath)).size > 0);
@@ -113,7 +118,7 @@ async function runSession(backgroundMode, artDataUrl = null, checkSecurity = fal
 try {
   await runSession("generated", null, true);
   await runSession("upload", "data:image/png;base64,iVBORw0KGgo=", false);
-  console.log(JSON.stringify({ pass: true, sessions: 2, checks: 18 }, null, 2));
+  console.log(JSON.stringify({ pass: true, sessions: 2, checks: 28 }, null, 2));
 } finally {
   await fs.rm(temporary, { recursive: true, force: true });
 }

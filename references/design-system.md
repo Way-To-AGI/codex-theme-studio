@@ -29,3 +29,7 @@ Generated CSS must not set `position`, `z-index`, `display`, `visibility`, `poin
 ## Contrast
 
 Use WCAG relative luminance. Body copy requires 4.5:1 against its surface. Large text and icons require 3:1. The compiler replaces an unsafe ink color with a high-contrast neutral and records the correction in its result.
+
+Validate the complete semantic matrix: body text/surface, body text/panel, secondary text/panel, accent/panel, support/panel, accent text/accent, and border/panel. Dark themes must keep the main surface in a genuinely dark luminance range; light themes must keep it in a genuinely light range. Prefer coherent automatic correction over preserving an unsafe raw color.
+
+`color-scheme` is not a substitute for Codex's official appearance setting. Always report the theme's designed appearance before applying because version-sensitive native surfaces may remain outside the injected token bridge.

@@ -34,6 +34,8 @@ The studio accepts a constrained JSON brief and compiles it into a manifest, CSS
 
 Only `light` and `dark` modes are accepted. IDs use letters, digits, hyphens, and underscores. Colors use six-digit hex notation. Text fields are length-clamped and treated as plain text.
 
+The compiler treats `mode` as the intended official Codex appearance. It may adjust an incompatible surface, ink, accent, or support color and records every change in `corrections`. Normalized briefs also include `appearance` and a `quality` report containing semantic contrast checks. These fields are optional when importing older schema-version-1 packages and are derived from `design.mode` when absent.
+
 `background.source` is `builtin`, `upload`, `generated`, or `none`. Generated artwork is produced by the agent outside the HTML server and then supplied with `--art`. PNG, JPEG, and WebP are accepted. Artwork remains local and is copied into the theme directory.
 
 `decorations.density` is `none`, `light`, or `standard`. The only supported templates are `sidebarWidget` and `cornerCard`; manifests cannot provide HTML, selectors, scripts, handlers, or arbitrary coordinates.
@@ -53,6 +55,9 @@ Only `light` and `dark` modes are accepted. IDs use letters, digits, hyphens, an
   "background": {},
   "decorations": {},
   "copy": {},
+  "appearance": { "designedFor": "dark", "switchPolicy": "prompt" },
+  "quality": { "score": 100, "grade": "excellent", "checks": [] },
+  "corrections": [],
   "baseTheme": {}
 }
 ```

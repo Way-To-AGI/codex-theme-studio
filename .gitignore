@@ -9,3 +9,9 @@ tmp/
 themes/*
 !themes/aurora-focus/
 !themes/aurora-focus/**
+!themes/tiga-light/
+!themes/tiga-light/brief.json
+!themes/tiga-light/tiga-light.json
+!themes/tiga-light/theme.css
+!themes/tiga-light/background.png
+themes/tiga-light/source-art.png

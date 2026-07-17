@@ -1,19 +1,19 @@
 {
   "schemaVersion": 1,
   "engine": "codex-theme-studio",
-  "id": "aurora-focus",
-  "displayName": "Aurora Focus",
-  "version": "1.0.0",
+  "id": "tiga-light",
+  "displayName": "Tiga · Dark Light of Hope",
+  "version": "1.2.0",
   "css": "theme.css",
   "art": "background.png",
   "design": {
     "mode": "dark",
     "direction": "aurora-glass",
     "palette": {
-      "accent": "#64DDF2",
-      "support": "#A58BFA",
-      "surface": "#0D1420",
-      "ink": "#F2F7FA"
+      "accent": "#8E7CFF",
+      "support": "#E05A69",
+      "surface": "#0B1020",
+      "ink": "#F4F7FF"
     },
     "shape": {
       "radius": 18,
@@ -28,47 +28,47 @@
   "quality": {
     "score": 100,
     "grade": "excellent",
-    "minimumRatio": 1.77,
+    "minimumRatio": 1.76,
     "checks": [
       {
         "id": "body",
-        "ratio": 17.1,
+        "ratio": 17.67,
         "target": 4.5,
         "pass": true
       },
       {
         "id": "panelText",
-        "ratio": 14.61,
+        "ratio": 15.16,
         "target": 4.5,
         "pass": true
       },
       {
         "id": "secondaryText",
-        "ratio": 6.36,
+        "ratio": 6.52,
         "target": 4.5,
         "pass": true
       },
       {
         "id": "accent",
-        "ratio": 9.88,
+        "ratio": 5.01,
         "target": 3,
         "pass": true
       },
       {
         "id": "support",
-        "ratio": 5.76,
+        "ratio": 4.51,
         "target": 3,
         "pass": true
       },
       {
         "id": "accentText",
-        "ratio": 11.48,
+        "ratio": 5.65,
         "target": 4.5,
         "pass": true
       },
       {
         "id": "border",
-        "ratio": 1.77,
+        "ratio": 1.76,
         "target": 1.5,
         "pass": true
       }
@@ -76,44 +76,44 @@
   },
   "corrections": [],
   "background": {
-    "source": "builtin",
+    "source": "generated",
     "position": "center right",
-    "veil": 0.78,
-    "prompt": "quiet aurora over a glass observatory, wide composition, negative space in the center"
+    "veil": 0.74,
+    "prompt": "Ultraman Tiga watching a luminous cosmic horizon, quiet central reading space"
   },
   "decorations": {
-    "density": "light",
+    "density": "standard",
     "sidebarWidget": {
       "enabled": true,
-      "icon": "✦",
-      "eyebrow": "CODEX / STUDIO",
-      "title": "Focus mode",
-      "caption": "Theme synchronized"
+      "icon": "G",
+      "eyebrow": "GUTS / COMMAND",
+      "title": "胜利队终端",
+      "caption": "光之能量 · 在线"
     },
     "cornerCard": {
-      "enabled": false,
-      "icon": "C",
-      "eyebrow": "CREATIVE SPACE",
-      "title": "Build with clarity",
-      "caption": "Ideas in motion"
+      "enabled": true,
+      "icon": "T",
+      "eyebrow": "ULTRA SIGNAL",
+      "title": "希望之光",
+      "caption": "新的任务已经同步"
     }
   },
   "copy": {
-    "brandTitle": "Aurora Focus",
+    "brandTitle": "Tiga · Dark Light of Hope",
     "brandSubtitle": "Codex Theme Studio",
-    "signature": "Build with clarity",
-    "tagline": "Build with clarity",
+    "signature": "向光而行，构建未来",
+    "tagline": "向光而行，构建未来",
     "projectPrefix": "选择项目 · ",
     "projectLabel": "选择项目",
-    "ribbon": "C"
+    "ribbon": "T"
   },
   "baseTheme": {
     "mode": "dark",
     "codeTheme": "codex",
-    "accent": "#64DDF2",
-    "contrast": 171,
-    "ink": "#F2F7FA",
-    "surface": "#0D1420",
+    "accent": "#8E7CFF",
+    "contrast": 177,
+    "ink": "#F4F7FF",
+    "surface": "#0B1020",
     "opaqueWindows": true,
     "fonts": {
       "windowsCode": "Cascadia Code",
@@ -124,7 +124,7 @@
     "semanticColors": {
       "diffAdded": "#2F7D57",
       "diffRemoved": "#8E3F52",
-      "skill": "#A58BFA"
+      "skill": "#E05A69"
     }
   }
 }

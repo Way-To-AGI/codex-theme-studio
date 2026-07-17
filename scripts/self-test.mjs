@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { buildThemePackage, contrastRatio, createTheme, importThemePackage, loadTheme, validateCss } from "./theme-core.mjs";
+import { buildThemePackage, contrastRatio, createTheme, importThemePackage, loadTheme, normalizeBrief, validateCss } from "./theme-core.mjs";
 
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "codex-theme-studio-test-"));
 try {
@@ -20,9 +20,14 @@ try {
   assert.ok(result.brief.corrections.includes("ink-adjusted-for-contrast"));
   assert.ok(contrastRatio(result.brief.palette.ink, result.brief.palette.surface) >= 4.5);
   assert.equal(result.manifest.decorations.cornerCard.enabled, true);
+  assert.equal(result.manifest.appearance.designedFor, "dark");
+  assert.equal(result.manifest.quality.grade, "excellent");
+  assert.ok(result.manifest.quality.checks.every((check) => check.pass));
+  assert.ok(Array.isArray(result.manifest.corrections));
   const loaded = await loadTheme(result.manifestPath);
   assert.equal(loaded.manifest.id, "self-test-theme");
   assert.match(loaded.css, /--color-token-side-bar-background/);
+  assert.match(loaded.css, /--cts-accent-ink/);
   assert.match(loaded.css, /pointer-events:\s*none/);
   const packaged = await buildThemePackage(result.manifestPath);
   assert.equal(packaged.bundle.format, "codex-theme");
@@ -43,10 +48,30 @@ try {
   assert.match(renderer, /aria-hidden/);
   assert.match(renderer, /interactiveRects/);
   assert.match(renderer, /dialogOpen/);
+  const unsafeLight = normalizeBrief({
+    id: "unsafe-light",
+    mode: "light",
+    palette: { accent: "#EEEEEE", support: "#FFFFFF", surface: "#111111", ink: "#DDDDDD" },
+  });
+  assert.ok(unsafeLight.corrections.includes("surface-lightened-for-light-mode"));
+  assert.ok(unsafeLight.corrections.includes("ink-adjusted-for-contrast"));
+  assert.ok(unsafeLight.corrections.includes("accent-adjusted-for-ui-contrast"));
+  assert.equal(unsafeLight.appearance.designedFor, "light");
+  assert.equal(unsafeLight.quality.score, 100);
+  assert.ok(unsafeLight.quality.checks.every((check) => check.pass));
+  const unsafeDark = normalizeBrief({
+    id: "unsafe-dark",
+    mode: "dark",
+    palette: { accent: "#111111", support: "#151515", surface: "#EEEEEE", ink: "#222222" },
+  });
+  assert.ok(unsafeDark.corrections.includes("surface-darkened-for-dark-mode"));
+  assert.ok(unsafeDark.corrections.includes("accent-adjusted-for-ui-contrast"));
+  assert.equal(unsafeDark.appearance.designedFor, "dark");
+  assert.equal(unsafeDark.quality.grade, "excellent");
   const studio = await fs.readFile(new URL("../assets/studio/index.html", import.meta.url), "utf8");
   assert.doesNotMatch(studio, /https?:\/\//i);
   assert.doesNotMatch(studio, /result\.innerHTML/);
-  console.log(JSON.stringify({ pass: true, checks: 21 }, null, 2));
+  console.log(JSON.stringify({ pass: true, checks: 35 }, null, 2));
 } finally {
   await fs.rm(temporary, { recursive: true, force: true });
 }

@@ -71,6 +71,46 @@ export function contrastRatio(a, b) {
   return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
+function moveUntil(color, target, predicate) {
+  let result = color;
+  for (let step = 0; step < 24 && !predicate(result); step += 1) result = mix(result, target, 0.08);
+  return result;
+}
+
+function ensureContrast(color, background, target, direction) {
+  return moveUntil(color, direction, (candidate) => contrastRatio(candidate, background) >= target);
+}
+
+function normalizePalette(mode, raw, defaults, corrections) {
+  const dark = mode === "dark";
+  const palette = {
+    accent: hex(raw?.accent, defaults.accent),
+    support: hex(raw?.support, defaults.support),
+    surface: hex(raw?.surface, defaults.surface),
+    ink: hex(raw?.ink, defaults.ink),
+  };
+  const correctedSurface = moveUntil(palette.surface, dark ? "#000000" : "#FFFFFF", (candidate) => dark ? luminance(candidate) <= 0.06 : luminance(candidate) >= 0.78);
+  if (correctedSurface !== palette.surface) {
+    palette.surface = correctedSurface;
+    corrections.push(dark ? "surface-darkened-for-dark-mode" : "surface-lightened-for-light-mode");
+  }
+  if (contrastRatio(palette.ink, palette.surface) < 4.5) {
+    palette.ink = dark ? "#F4F7FA" : "#1D232B";
+    corrections.push("ink-adjusted-for-contrast");
+  }
+  const panel = dark ? mix(palette.surface, "#FFFFFF", 0.065) : mix(palette.surface, "#FFFFFF", 0.56);
+  for (const key of ["accent", "support"]) {
+    const corrected = moveUntil(palette[key], dark ? "#FFFFFF" : "#000000", (candidate) => (
+      contrastRatio(candidate, panel) >= 3 && (dark ? luminance(candidate) > luminance(panel) : luminance(candidate) < luminance(panel))
+    ));
+    if (corrected !== palette[key]) {
+      palette[key] = corrected;
+      corrections.push(`${key}-adjusted-for-ui-contrast`);
+    }
+  }
+  return palette;
+}
+
 function paletteDefaults(mode, direction) {
   const presets = {
     "quiet-editorial": { accent: "#3867D6", support: "#7C8AA5", surface: "#F4F3EF", ink: "#20242B" },
@@ -98,23 +138,14 @@ export function normalizeBrief(raw = {}) {
   const mode = MODES.has(raw.mode) ? raw.mode : "light";
   const direction = DIRECTIONS.has(raw.direction) ? raw.direction : (mode === "dark" ? "aurora-glass" : "quiet-editorial");
   const defaults = paletteDefaults(mode, direction);
-  const palette = {
-    accent: hex(raw.palette?.accent, defaults.accent),
-    support: hex(raw.palette?.support, defaults.support),
-    surface: hex(raw.palette?.surface, defaults.surface),
-    ink: hex(raw.palette?.ink, defaults.ink),
-  };
-  const corrections = [];
-  if (contrastRatio(palette.ink, palette.surface) < 4.5) {
-    palette.ink = mode === "dark" ? "#F4F7FA" : "#1D232B";
-    corrections.push("ink-adjusted-for-contrast");
-  }
+  const corrections = Array.isArray(raw.corrections) ? raw.corrections.filter((value) => typeof value === "string").slice(0, 20) : [];
+  const palette = normalizePalette(mode, raw.palette, defaults, corrections);
   const id = text(raw.id, `codex-theme-${Date.now()}`, 48).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
   if (!SAFE_ID.test(id)) throw new Error("Theme id must contain only letters, digits, hyphens, and underscores");
   const density = DENSITIES.has(raw.decorations?.density) ? raw.decorations.density : "light";
   const allowSidebar = density !== "none";
   const allowCorner = density === "standard";
-  return {
+  const normalized = {
     id,
     name: text(raw.name, id, 64),
     version: /^\d+\.\d+\.\d+$/.test(raw.version ?? "") ? raw.version : "1.0.0",
@@ -145,6 +176,15 @@ export function normalizeBrief(raw = {}) {
     },
     corrections,
   };
+  normalized.appearance = {
+    designedFor: mode,
+    switchPolicy: "prompt",
+    message: mode === "dark"
+      ? "This theme is designed for Codex dark appearance. Switch Codex to dark mode if native surfaces look mixed."
+      : "This theme is designed for Codex light appearance. Switch Codex to light mode if native surfaces look mixed.",
+  };
+  normalized.quality = analyzePalette(mode, palette);
+  return normalized;
 }
 
 function themeColors(brief) {
@@ -153,9 +193,36 @@ function themeColors(brief) {
   const panel = dark ? mix(palette.surface, "#FFFFFF", 0.065) : mix(palette.surface, "#FFFFFF", 0.56);
   const elevated = dark ? mix(palette.surface, "#FFFFFF", 0.11) : mix(palette.surface, "#FFFFFF", 0.76);
   const under = dark ? mix(palette.surface, "#000000", 0.32) : mix(palette.surface, palette.accent, 0.035);
-  const muted = mix(palette.ink, palette.surface, dark ? 0.42 : 0.46);
-  const border = mix(palette.surface, palette.ink, dark ? 0.22 : 0.16);
-  return { panel, elevated, under, muted, border };
+  const mutedBase = mix(palette.ink, palette.surface, dark ? 0.36 : 0.38);
+  const muted = ensureContrast(mutedBase, panel, 4.5, palette.ink);
+  const borderBase = mix(palette.surface, palette.ink, dark ? 0.24 : 0.18);
+  const border = ensureContrast(borderBase, panel, 1.5, palette.ink);
+  const accentInk = contrastRatio("#FFFFFF", palette.accent) >= 4.5 ? "#FFFFFF" : "#11151B";
+  return { panel, elevated, under, muted, border, accentInk };
+}
+
+export function analyzePalette(mode, palette) {
+  const colors = themeColors({ mode, palette });
+  const checks = [
+    ["body", palette.ink, palette.surface, 4.5],
+    ["panelText", palette.ink, colors.panel, 4.5],
+    ["secondaryText", colors.muted, colors.panel, 4.5],
+    ["accent", palette.accent, colors.panel, 3],
+    ["support", palette.support, colors.panel, 3],
+    ["accentText", colors.accentInk, palette.accent, 4.5],
+    ["border", colors.border, colors.panel, 1.5],
+  ].map(([id, foreground, background, target]) => {
+    const ratio = Number(contrastRatio(foreground, background).toFixed(2));
+    return { id, ratio, target, pass: ratio >= target };
+  });
+  const failed = checks.filter((check) => !check.pass).length;
+  const minimumRatio = Math.min(...checks.map((check) => check.ratio));
+  return {
+    score: Math.max(0, 100 - failed * 18),
+    grade: failed === 0 ? "excellent" : failed <= 2 ? "review" : "unsafe",
+    minimumRatio,
+    checks,
+  };
 }
 
 export function generateCss(briefInput) {
@@ -189,6 +256,7 @@ export function generateCss(briefInput) {
   --cts-ink: ${palette.ink};
   --cts-muted: ${c.muted};
   --cts-border: ${c.border};
+  --cts-accent-ink: ${c.accentInk};
   --cts-radius: ${shape.radius}px;
   --color-background-surface: ${palette.surface} !important;
   --color-background-surface-under: ${c.under} !important;
@@ -295,7 +363,7 @@ html.codex-theme-studio-skin :is(button, [role="button"], a):focus-visible {
 }
 
 .cts-decoration-inner { position: relative; z-index: 1; height: 100%; padding: 14px; box-sizing: border-box; }
-.cts-decoration-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; color: ${dark ? c.under : "#FFFFFF"}; background: var(--cts-accent); font-weight: 800; box-shadow: 0 7px 18px ${alpha(palette.accent, 0.28)}; }
+.cts-decoration-icon { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; color: var(--cts-accent-ink); background: var(--cts-accent); font-weight: 800; box-shadow: 0 7px 18px ${alpha(palette.accent, 0.28)}; }
 .cts-decoration-eyebrow { margin-top: 12px; color: var(--cts-accent); font-size: 9px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
 .cts-decoration-title { margin-top: 4px; color: var(--cts-ink); font-size: 14px; line-height: 1.25; font-weight: 760; }
 .cts-decoration-caption { margin-top: 5px; color: var(--cts-muted); font-size: 10px; line-height: 1.35; }
@@ -374,6 +442,9 @@ export async function createTheme(briefInput, options = {}) {
     css: "theme.css",
     art,
     design: { mode: brief.mode, direction: brief.direction, palette: brief.palette, shape: brief.shape },
+    appearance: brief.appearance,
+    quality: brief.quality,
+    corrections: brief.corrections,
     background: brief.background,
     decorations: brief.decorations,
     copy: {

@@ -81,6 +81,18 @@ function runRuntime(args, options = {}) {
 
 const options = parseArgs(process.argv.slice(2));
 const theme = await loadTheme(options.theme);
+const appearance = theme.manifest.appearance ?? {
+  designedFor: theme.manifest.design?.mode ?? theme.manifest.baseTheme?.mode ?? "light",
+  switchPolicy: "prompt",
+};
+console.log(JSON.stringify({
+  status: "appearance-reminder",
+  themeId: theme.manifest.id,
+  designedFor: appearance.designedFor,
+  message: appearance.designedFor === "dark"
+    ? "This theme is designed for dark appearance. Keep Codex in dark mode to avoid mixed native surfaces."
+    : "This theme is designed for light appearance. Keep Codex in light mode to avoid mixed native surfaces.",
+}));
 await fs.mkdir(stateRoot, { recursive: true });
 let previousState = null;
 try { previousState = JSON.parse(await fs.readFile(statePath, "utf8")); } catch { /* first run */ }
@@ -148,4 +160,4 @@ if (options.screenshot) {
   }
   if (!captured) console.warn(`Theme is active, but screenshot capture did not complete: ${options.screenshot}`);
 }
-console.log(JSON.stringify({ active: true, theme: theme.manifest.id, port: options.port, watcherPid: watcher.pid, screenshot: options.screenshot }, null, 2));
+console.log(JSON.stringify({ active: true, theme: theme.manifest.id, designedFor: appearance.designedFor, quality: theme.manifest.quality ?? null, port: options.port, watcherPid: watcher.pid, screenshot: options.screenshot }, null, 2));
