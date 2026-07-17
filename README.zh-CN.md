@@ -2,13 +2,13 @@
 
 [English](README.md)
 
-一个面向官方 Codex 桌面应用的交互式主题设计 Skill，用于引导生成、预览、应用、验证、导入、导出和安全恢复精致主题。
+一个面向官方 Codex 桌面应用的主题设计 Skill，支持 Agent 直创与 HTML 工作台两种创建模式，以及预览、应用、验证、导入、导出和安全恢复。
 
 ![Codex Theme Studio 预览](assets/readme-preview.png)
 
 ## 主要能力
 
-- 四步交互式 HTML 主题工作台，不需要手写复杂配置。
+- 双模式创建：在聊天中让 Agent 自主完成，或使用四步 HTML 工作台逐项选择。
 - 支持浅色、深色，以及编辑部、极光、赛博和温暖工作室等设计方向。
 - 自动协调语义配色、文字、圆角、边框、阴影和表面层次。
 - 提供语义配色质量评分，自动修正模式不匹配的表面亮度、正文、强调色和辅助色。
@@ -62,7 +62,28 @@ git clone https://github.com/Way-To-AGI/codex-theme-studio.git (Join-Path $skill
 git -C "${CODEX_HOME:-$HOME/.codex}/skills/codex-theme-studio" pull --ff-only
 ```
 
-## 启动交互式工作台
+## 选择创建模式
+
+调用 Skill 时可直接说明模式：
+
+```text
+使用 $codex-theme-studio，Agent 直接创建一个红色复古平台游戏风格主题，不要打开 HTML。
+使用 $codex-theme-studio，打开 HTML 工作台让我自己选择。
+```
+
+未明确模式时，Agent 会先询问选择 **Agent 直创** 还是 **HTML 工作台**，不会提前打开网页。Agent 直创会根据聊天描述自主构建 Brief、准备背景、编译、应用并完成实机截图验证；HTML 工作台把审美选择交给用户，提交后仍由 Agent 完成相同的编译与 QA 流程。
+
+命令行也提供可见选择入口：
+
+```bash
+node scripts/theme.mjs create
+node scripts/theme.mjs create agent
+node scripts/theme.mjs create html
+```
+
+`create agent` 不打开网页，而是提示回到聊天描述主题；`create html` 打开现有工作台。`node scripts/theme.mjs studio` 保留为兼容别名。
+
+## 启动 HTML 工作台
 
 ```bash
 cd "${CODEX_HOME:-$HOME/.codex}/skills/codex-theme-studio"
@@ -82,10 +103,10 @@ node scripts/studio-server.mjs --wait-for-submit
 
 ## 在 Codex 中使用
 
-调用 Skill 并描述目标，例如：
+调用 Skill，明确创建模式并描述目标，例如：
 
 ```text
-使用 $codex-theme-studio 创建一个浅色、雾山背景、装饰克制的主题。
+使用 $codex-theme-studio，Agent 直接创建一个浅色、雾山背景、装饰克制的主题，不打开 HTML。
 ```
 
 如果需要 AI 背景图，Codex 会生成宽屏位图，让中央阅读列和输入框后方保持安静留白，然后使用 `--art` 编译主题。
@@ -101,6 +122,7 @@ node scripts/theme.mjs use aurora-focus
 node scripts/theme.mjs web
 node scripts/theme.mjs native
 node scripts/theme.mjs restore
+node scripts/theme.mjs create
 node scripts/theme.mjs studio
 ```
 
