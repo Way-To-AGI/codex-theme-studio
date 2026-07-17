@@ -1,10 +1,10 @@
 # Codex Theme Studio
 
-[简体中文](README.zh-CN.md)
+[简体中文](README.zh-CN.md) · [Follow updates on X / Twitter](https://x.com/NULL_SSR)
 
 A Codex Skill with Agent-direct and HTML-studio creation modes for designing, generating, previewing, applying, validating, exporting, and safely restoring polished themes for the official Codex desktop app.
 
-![Codex Theme Studio preview](assets/readme-preview.png)
+![Codex Theme Studio — privacy-safe synthetic product preview](assets/social-preview.png)
 
 ## Highlights
 

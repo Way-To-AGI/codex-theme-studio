@@ -1,10 +1,10 @@
 # Codex Theme Studio
 
-[English](README.md)
+[English](README.md) · [在 X / Twitter 关注更新](https://x.com/NULL_SSR)
 
 一个面向官方 Codex 桌面应用的主题设计 Skill，支持 Agent 直创与 HTML 工作台两种创建模式，以及预览、应用、验证、导入、导出和安全恢复。
 
-![Codex Theme Studio 预览](assets/readme-preview.png)
+![Codex Theme Studio 隐私安全合成产品预览](assets/social-preview.png)
 
 ## 主要能力
 
