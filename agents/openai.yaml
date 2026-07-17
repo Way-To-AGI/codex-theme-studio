@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex Theme Studio"
-  short_description: "交互式生成、预览、应用并验证精致 Codex 主题"
-  default_prompt: "Use $codex-theme-studio to guide me through creating and applying a polished Codex theme."
+  short_description: "Agent 直创或 HTML 工作台生成并验证 Codex 主题"
+  default_prompt: "Use $codex-theme-studio to create and apply a polished Codex theme. Ask me to choose Agent direct creation or the HTML studio unless I already made the mode clear."

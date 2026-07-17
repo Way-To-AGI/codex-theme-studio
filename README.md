@@ -2,13 +2,13 @@
 
 [简体中文](README.zh-CN.md)
 
-An interactive Codex Skill for designing, generating, previewing, applying, validating, exporting, and safely restoring polished themes for the official Codex desktop app.
+A Codex Skill with Agent-direct and HTML-studio creation modes for designing, generating, previewing, applying, validating, exporting, and safely restoring polished themes for the official Codex desktop app.
 
 ![Codex Theme Studio preview](assets/readme-preview.png)
 
 ## Highlights
 
-- Guided four-step HTML theme studio instead of a long configuration form.
+- Two creation modes: let the Agent build autonomously in chat, or make each choice in the guided four-step HTML studio.
 - Light and dark modes with curated editorial, aurora, cyber, and warm directions.
 - Coordinated semantic colors, typography, radius, border, shadow, and surface treatments.
 - Semantic palette scoring with automatic correction for mode-incompatible surfaces, text, accents, and supporting colors.
@@ -62,7 +62,28 @@ Update later with:
 git -C "${CODEX_HOME:-$HOME/.codex}/skills/codex-theme-studio" pull --ff-only
 ```
 
-## Start the visual studio
+## Choose a creation mode
+
+State the mode when invoking the Skill:
+
+```text
+Use $codex-theme-studio in Agent direct mode to create a red retro platform-game theme without opening HTML.
+Use $codex-theme-studio and open the HTML studio so I can make the choices.
+```
+
+If the mode is unclear, the Agent asks you to choose **Agent direct creation** or **HTML studio** before opening a page. Agent direct mode derives the brief, prepares artwork, compiles, applies, and performs live screenshot QA from the chat description. HTML studio mode leaves aesthetic choices to you, then hands the same compiler and QA pipeline back to the Agent.
+
+The CLI also exposes both choices:
+
+```bash
+node scripts/theme.mjs create
+node scripts/theme.mjs create agent
+node scripts/theme.mjs create html
+```
+
+`create agent` does not open a page; it directs you back to chat. `create html` opens the existing studio. `node scripts/theme.mjs studio` remains a compatibility alias.
+
+## Start the HTML studio
 
 ```bash
 cd "${CODEX_HOME:-$HOME/.codex}/skills/codex-theme-studio"
@@ -82,10 +103,10 @@ Launching without `--wait-for-submit` is a standalone fallback. It saves the des
 
 ## Use from Codex
 
-Invoke the Skill and describe the desired result, for example:
+Invoke the Skill, state the creation mode, and describe the desired result, for example:
 
 ```text
-Use $codex-theme-studio to create a calm light theme with a misty mountain background and minimal decoration.
+Use $codex-theme-studio in Agent direct mode to create a calm light theme with a misty mountain background and minimal decoration, without opening HTML.
 ```
 
 When AI artwork is requested, Codex should generate a wide bitmap with quiet negative space behind the central reading column and composer, save it locally, then compile it with `--art`.
@@ -101,6 +122,7 @@ node scripts/theme.mjs use aurora-focus
 node scripts/theme.mjs web
 node scripts/theme.mjs native
 node scripts/theme.mjs restore
+node scripts/theme.mjs create
 node scripts/theme.mjs studio
 ```
 

@@ -7,10 +7,24 @@ description: Interactively design, generate, preview, apply, hot-switch, verify,
 
 Create reversible Codex themes through a constrained design brief and loopback Chromium DevTools Protocol. Preserve the signed app, user data, authentication, threads, plugins, and native interaction hierarchy.
 
-## Choose the workflow
+## Choose the creation mode first
+
+- Before opening any page or generating files, identify the user's creation mode. Explicit requests such as "do it yourself", "direct", "chat only", or "do not open HTML" select **Agent direct creation**. Requests for the studio, visual form, browser, or HTML select **HTML studio**.
+- If the user has not made the mode clear, ask one concise question: **Agent direct creation or HTML studio?** Do not open the studio until the user chooses HTML.
+- The choice changes only how the brief is created. Both modes use the same constrained schema, compiler, preflight, runtime, rollback, and QA requirements.
+- A terminal user can inspect the two choices with `node scripts/theme.mjs create`, select direct guidance with `node scripts/theme.mjs create agent`, or open the studio with `node scripts/theme.mjs create html`.
+
+## Agent direct creation
+
+1. Treat the user's chat description and supplied references as the aesthetic brief. Make coherent design decisions autonomously instead of opening the HTML studio.
+2. Build a constrained `brief.json` that follows `references/theme-schema.md`; do not introduce arbitrary CSS, selectors, scripts, handlers, or coordinates through the brief.
+3. If artwork is needed, generate or prepare a local wide bitmap with quiet negative space behind the reading column and composer. Use only artwork the user is entitled to use.
+4. Compile with `node scripts/compile-theme.mjs --brief /absolute/brief.json [--art /absolute/art.png]`, then continue through preview, preflight, application, live verification, screenshot inspection, and iteration.
+5. Do not claim completion from brief creation or compilation alone. Apply the same appearance warning, restart authorization, static checks, live controls check, and screenshot QA used by the HTML flow.
+
+## HTML studio creation
 
 - Start the user-driven studio with `node scripts/studio-server.mjs --wait-for-submit`. Keep that process attached until it emits the `submitted` event, then continue from its `briefPath`.
-- Generate directly from a JSON brief with `node scripts/compile-theme.mjs --brief /absolute/brief.json [--art /absolute/art.png]`.
 - Inspect mode compatibility and palette quality with `node scripts/preflight-theme.mjs --theme <id-or-manifest>` before applying.
 - Apply with `node scripts/start-theme.mjs --theme <id-or-manifest>`. Add `--restart-existing` only after explicit authorization.
 - Verify with `node scripts/runtime.mjs --verify --theme <id-or-manifest> --screenshot /absolute/theme.png` and inspect the screenshot.
@@ -30,7 +44,7 @@ Create reversible Codex themes through a constrained design brief and loopback C
 
 Read `references/theme-schema.md` before changing the brief or manifest. Read `references/design-system.md` before editing generated CSS. Read `references/runtime-notes.md` before changing launch, CDP, persistence, or restore behavior. Read `references/qa-inventory.md` before declaring completion.
 
-## Guided creation
+## HTML guided creation
 
 1. Launch `node scripts/studio-server.mjs --wait-for-submit` in a long-running command session. Tell the user that the local studio is open, they should make the choices and click the final submit button, and no additional chat message is required.
 2. The user owns aesthetic choices by default. Do not click or fill the studio for them unless they explicitly ask the Agent to choose. Keep the current Agent turn active and poll the running command instead of ending at the HTML step.

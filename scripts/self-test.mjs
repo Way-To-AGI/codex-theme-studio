@@ -79,9 +79,12 @@ try {
   assert.doesNotMatch(switcher, /\.innerHTML\s*=/);
   assert.doesNotMatch(inAppSwitcher, /\.innerHTML\s*=/);
   assert.match(inAppSwitcher, /Switch Codex theme/);
-  for (const command of ["list", "status", "use", "native", "restore", "web", "studio"]) assert.match(cli, new RegExp(`command === "${command}"`));
+  for (const command of ["list", "status", "use", "native", "restore", "web", "create", "studio"]) assert.match(cli, new RegExp(`command === "${command}"`));
+  assert.match(cli, /theme\.mjs create <agent\|html>/);
+  assert.match(cli, /opensHtml: false/);
+  assert.match(cli, /opensHtml: true/);
   assert.match(runtime, /\/avatar-overlay/);
-  console.log(JSON.stringify({ pass: true, checks: 47 }, null, 2));
+  console.log(JSON.stringify({ pass: true, checks: 51 }, null, 2));
 } finally {
   await fs.rm(temporary, { recursive: true, force: true });
 }

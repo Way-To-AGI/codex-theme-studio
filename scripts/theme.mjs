@@ -53,6 +53,22 @@ function print(value) {
   else console.log(value);
 }
 
+function openStudio() {
+  const child = spawn(process.execPath, [path.join(here, "studio-server.mjs"), "--port", "0"], { detached: true, stdio: "ignore" });
+  child.unref();
+  return { mode: "html", opened: true, pid: child.pid };
+}
+
+function creationModes() {
+  return {
+    modes: [
+      { id: "agent", label: "Agent direct creation", opensHtml: false, next: "Describe the desired theme in chat; the Agent builds and verifies it." },
+      { id: "html", label: "HTML studio", opensHtml: true, next: "Open the guided visual studio." },
+    ],
+    usage: "theme.mjs create <agent|html>",
+  };
+}
+
 if (command === "list") {
   const [themes, current] = await Promise.all([listThemes(), state()]);
   if (jsonOutput) print({ activeTheme: current.activeTheme ?? null, themes });
@@ -88,9 +104,14 @@ if (command === "list") {
     run("start-theme.mjs", ["--theme", initial, ...startOptions]);
     await waitControl(); await control("open", {}); print({ opened: true, initialTheme: initial });
   }
+} else if (command === "create") {
+  const mode = argv[1];
+  if (!mode || mode.startsWith("--")) print(creationModes());
+  else if (mode === "agent") print({ mode: "agent", opened: false, next: "Continue in chat and describe the theme. The Agent will create, compile, apply, and verify it without opening HTML." });
+  else if (mode === "html" || mode === "studio") print(openStudio());
+  else throw new Error("Usage: theme.mjs create <agent|html>");
 } else if (command === "studio") {
-  const child = spawn(process.execPath, [path.join(here, "studio-server.mjs"), "--port", "0"], { detached: true, stdio: "ignore" });
-  child.unref(); print({ opened: true, pid: child.pid });
+  print(openStudio());
 } else {
   console.log(`Codex Theme Studio CLI
 
@@ -100,7 +121,8 @@ if (command === "list") {
   native                        Restore native appearance, keep manager
   restore                       Restore native appearance and stop manager
   web [options]                  Open the visual theme library
-  studio                        Open the theme creation studio
+  create [agent|html]            Choose Agent-direct or HTML creation
+  studio                        Open the HTML studio (compatibility alias)
 
 Options:
   --restart-existing            Allow one graceful Codex restart
