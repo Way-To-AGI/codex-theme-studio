@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { listThemes, loadTheme } from "./theme-core.mjs";
 import { startThemeControl } from "./theme-control-server.mjs";
-import { securePrivateFile, statePathFor } from "./platform-runtime.mjs";
+import { openLoopbackUrl, securePrivateFile, statePathFor } from "./platform-runtime.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -162,6 +162,9 @@ async function managerExpression(control) {
   return template.replace("__CTS_CONTROL_JSON__", JSON.stringify(control));
 }
 
+const bridgeDrainExpression = `(() => window.__CODEX_THEME_STUDIO_SWITCHER_STATE__?.drainRequests?.() ?? [])()`;
+const bridgeDeliveryExpression = (id, result, error) => `(() => window.__CODEX_THEME_STUDIO_SWITCHER_STATE__?.deliver?.(${JSON.stringify(id)}, ${JSON.stringify(result ?? null)}, ${JSON.stringify(error ?? null)}) ?? false)()`;
+
 const verifyExpression = (expected, smoke) => `(() => {
   const rect = (node) => { if (!node) return null; const r = node.getBoundingClientRect(); return { left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height }; };
   const visible = (value) => Boolean(value && value.width > 0 && value.height > 0);
@@ -260,7 +263,7 @@ async function runWatch(options) {
   let queue = Promise.resolve();
   const statePath = options.statePath ?? statePathFor();
   const control = options.controlPort && options.controlToken ? { port: options.controlPort, token: options.controlToken } : null;
-  const switcherExpression = await managerExpression(control);
+  const switcherExpression = await managerExpression(control ? { bridge: true } : null);
   const enqueue = (operation) => { const next = queue.then(operation, operation); queue = next.catch(() => {}); return next; };
   const saveActive = async (nextPayload) => {
     let state = {};
@@ -274,9 +277,9 @@ async function runWatch(options) {
     await securePrivateFile(temporary);
     await fs.rename(temporary, statePath);
   };
-  const applyCurrent = async (session) => {
+  const applyCurrent = async (session, refreshSwitcher = true) => {
     if (payload) await apply(session, payload); else await session.evaluate(removeExpression);
-    if (switcherExpression) await session.evaluate(switcherExpression);
+    if (refreshSwitcher && switcherExpression) await session.evaluate(switcherExpression);
   };
   const verifyCurrent = async () => {
     if (!payload) return true;
@@ -288,9 +291,46 @@ async function runWatch(options) {
     }
     return true;
   };
-  process.on("SIGINT", () => { stopping = true; });
-  process.on("SIGTERM", () => { stopping = true; });
   let controlServer = null;
+  const stopWatching = () => {
+    stopping = true;
+    for (const session of sessions.values()) session.close();
+    controlServer?.server.closeAllConnections?.();
+    controlServer?.server.close();
+  };
+  process.on("SIGINT", stopWatching);
+  process.on("SIGTERM", stopWatching);
+  const switchTheme = (themeId) => enqueue(async () => {
+        const previous = payload;
+        const candidate = await loadPayload(themeId);
+        try {
+          payload = candidate;
+          await Promise.all([...sessions.values()].map((session) => applyCurrent(session, false)));
+          await verifyCurrent();
+          await saveActive(payload);
+          return { activeTheme: payload.theme.id, themes: await listThemes(), designedFor: (await loadTheme(themeId)).manifest.appearance?.designedFor ?? "light" };
+        } catch (error) {
+          payload = previous;
+          await Promise.allSettled([...sessions.values()].map((session) => applyCurrent(session, false)));
+          throw new Error(`Theme switch rolled back: ${error.message}`);
+        }
+      });
+  const nativeTheme = () => enqueue(async () => {
+        const previous = payload;
+        try {
+          payload = null;
+          await Promise.all([...sessions.values()].map((session) => applyCurrent(session, false)));
+          await saveActive(null);
+          return { activeTheme: null, themes: await listThemes(), native: true };
+        } catch (error) { payload = previous; await Promise.allSettled([...sessions.values()].map((session) => applyCurrent(session, false))); throw error; }
+      });
+  const shutdownTheme = () => enqueue(async () => {
+        payload = null;
+        await Promise.allSettled([...sessions.values()].map(async (session) => { await session.evaluate(removeExpression); await session.evaluate(removeManagerExpression); }));
+        await fs.rm(statePath, { force: true });
+        stopping = true;
+        return { restored: true, stopped: true };
+      });
   if (control) {
     controlServer = await startThemeControl({
       ...control,
@@ -302,39 +342,25 @@ async function runWatch(options) {
         if (!theme.artPath) return null;
         return { mimeType: mimeType(theme.artPath), data: await fs.readFile(theme.artPath) };
       },
-      switchTheme: (themeId) => enqueue(async () => {
-        const previous = payload;
-        const candidate = await loadPayload(themeId);
-        try {
-          payload = candidate;
-          await Promise.all([...sessions.values()].map(applyCurrent));
-          await verifyCurrent();
-          await saveActive(payload);
-          return { activeTheme: payload.theme.id, themes: await listThemes(), designedFor: (await loadTheme(themeId)).manifest.appearance?.designedFor ?? "light" };
-        } catch (error) {
-          payload = previous;
-          await Promise.allSettled([...sessions.values()].map(applyCurrent));
-          throw new Error(`Theme switch rolled back: ${error.message}`);
-        }
-      }),
-      nativeTheme: () => enqueue(async () => {
-        const previous = payload;
-        try {
-          payload = null;
-          await Promise.all([...sessions.values()].map(applyCurrent));
-          await saveActive(null);
-          return { activeTheme: null, themes: await listThemes(), native: true };
-        } catch (error) { payload = previous; await Promise.allSettled([...sessions.values()].map(applyCurrent)); throw error; }
-      }),
-      shutdownTheme: () => enqueue(async () => {
-        payload = null;
-        await Promise.allSettled([...sessions.values()].map(async (session) => { await session.evaluate(removeExpression); await session.evaluate(removeManagerExpression); }));
-        await fs.rm(statePath, { force: true });
-        stopping = true;
-        return { restored: true, stopped: true };
-      }),
+      switchTheme,
+      nativeTheme,
+      shutdownTheme,
     });
   }
+  const handleBridgeRequest = async (request) => {
+    if (request.route === "themes") return { activeTheme: payload?.theme?.id ?? null, runtimeReady: sessions.size > 0, themes: await listThemes() };
+    if (request.route === "switch") return switchTheme(request.body?.theme);
+    if (request.route === "native") return nativeTheme();
+    if (request.route === "open") { if (!controlServer) throw new Error("Theme library is unavailable"); openLoopbackUrl(controlServer.url); return { ok: true }; }
+    throw new Error("Unsupported in-app theme action");
+  };
+  const drainBridge = async (session) => {
+    const requests = await session.evaluate(bridgeDrainExpression);
+    for (const request of Array.isArray(requests) ? requests : []) {
+      try { await session.evaluate(bridgeDeliveryExpression(request.id, await handleBridgeRequest(request), null)); }
+      catch (error) { await session.evaluate(bridgeDeliveryExpression(request.id, null, error.message)); }
+    }
+  };
   while (!stopping) {
     let targets = [];
     try { targets = await waitForTargets(options.port, 1800); }
@@ -352,9 +378,14 @@ async function runWatch(options) {
         sessions.set(target.id, session);
       } catch (error) { console.error(`[theme-studio] inject failed: ${error.message}`); }
     }
-    await new Promise((resolve) => setTimeout(resolve, 650));
+    for (const session of sessions.values()) {
+      try { await drainBridge(session); }
+      catch (error) { console.error(`[theme-studio] in-app bridge failed: ${error.message}`); }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
   }
   for (const session of sessions.values()) session.close();
+  controlServer?.server.closeAllConnections?.();
   controlServer?.server.close();
 }
 

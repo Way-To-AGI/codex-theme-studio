@@ -78,13 +78,18 @@ try {
   assert.doesNotMatch(switcher, /https?:\/\//i);
   assert.doesNotMatch(switcher, /\.innerHTML\s*=/);
   assert.doesNotMatch(inAppSwitcher, /\.innerHTML\s*=/);
+  assert.doesNotMatch(inAppSwitcher, /\bfetch\s*\(/);
   assert.match(inAppSwitcher, /Switch Codex theme/);
+  assert.match(inAppSwitcher, /drainRequests/);
+  assert.match(inAppSwitcher, /deliver/);
   for (const command of ["list", "status", "use", "native", "restore", "web", "create", "studio"]) assert.match(cli, new RegExp(`command === "${command}"`));
   assert.match(cli, /theme\.mjs create <agent\|html>/);
   assert.match(cli, /opensHtml: false/);
   assert.match(cli, /opensHtml: true/);
   assert.match(runtime, /\/avatar-overlay/);
-  console.log(JSON.stringify({ pass: true, checks: 51 }, null, 2));
+  assert.match(runtime, /handleBridgeRequest/);
+  assert.match(runtime, /closeAllConnections/);
+  console.log(JSON.stringify({ pass: true, checks: 56 }, null, 2));
 } finally {
   await fs.rm(temporary, { recursive: true, force: true });
 }

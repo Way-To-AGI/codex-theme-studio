@@ -3,7 +3,7 @@
   const STYLE_ID = `${ID}-style`;
   const STATE_KEY = "__CODEX_THEME_STUDIO_SWITCHER_STATE__";
   window[STATE_KEY]?.cleanup?.();
-  if (!control?.port || !control?.token || !document.body) return false;
+  if (!control?.bridge || !document.body) return false;
 
   const style = document.createElement("style");
   style.id = STYLE_ID;
@@ -40,15 +40,24 @@
   const webButton = document.createElement("button"); webButton.type = "button"; webButton.className = "cts-switch-action"; webButton.textContent = "主题库 ↗";
   footer.append(nativeButton, webButton); panel.append(title, list, footer); root.append(button, panel); document.body.appendChild(root);
 
-  const request = async (route, body) => {
-    const response = await fetch(`http://127.0.0.1:${control.port}/api/${route}`, {
-      method: body ? "POST" : "GET",
-      headers: { "x-cts-token": control.token, ...(body ? { "content-type": "application/json" } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
-    return result;
+  const requests = [];
+  const pending = new Map();
+  let nextRequestId = 1;
+  const request = (route, body) => new Promise((resolve, reject) => {
+    const id = nextRequestId++;
+    const timer = setTimeout(() => {
+      pending.delete(id);
+      reject(new Error("Theme manager did not respond"));
+    }, 20000);
+    pending.set(id, { resolve, reject, timer });
+    requests.push({ id, route, body: body ?? null });
+  });
+  const deliver = (id, result, error) => {
+    const entry = pending.get(id);
+    if (!entry) return false;
+    pending.delete(id); clearTimeout(entry.timer);
+    if (error) entry.reject(new Error(error)); else entry.resolve(result);
+    return true;
   };
   const showError = (error) => { list.replaceChildren(); const node = document.createElement("div"); node.className = "cts-switch-error"; node.textContent = error.message; list.append(node); };
   const render = async () => {
@@ -87,7 +96,11 @@
   document.addEventListener("pointerdown", close, true); addEventListener("resize", place, { passive:true });
   const observer = new MutationObserver(() => queueMicrotask(place)); observer.observe(document.documentElement, { childList:true, subtree:true });
   const timer = setInterval(place, 3500);
-  const cleanup = () => { observer.disconnect(); clearInterval(timer); removeEventListener("resize", place); document.removeEventListener("pointerdown", close, true); root.remove(); style.remove(); delete window[STATE_KEY]; return true; };
-  window[STATE_KEY] = { cleanup, place }; place();
+  const cleanup = () => {
+    observer.disconnect(); clearInterval(timer); removeEventListener("resize", place); document.removeEventListener("pointerdown", close, true);
+    for (const entry of pending.values()) { clearTimeout(entry.timer); entry.reject(new Error("Theme manager reloaded")); }
+    pending.clear(); requests.length = 0; root.remove(); style.remove(); delete window[STATE_KEY]; return true;
+  };
+  window[STATE_KEY] = { cleanup, place, drainRequests: () => requests.splice(0), deliver }; place();
   return true;
 })(__CTS_CONTROL_JSON__)
