@@ -8,7 +8,7 @@ import { commandFor, findOfficialApp, isAllowedWindowsExecutable, officialAppPid
 let checks = 0;
 const check = (condition) => { assert.ok(condition); checks += 1; };
 
-assert.equal(stateRootFor("darwin", {}, "/Users/test"), "/Users/test/Library/Application Support/CodexThemeStudio"); checks += 1;
+assert.equal(stateRootFor("darwin", {}, "/example-home"), "/example-home/Library/Application Support/CodexThemeStudio"); checks += 1;
 assert.equal(stateRootFor("win32", { LOCALAPPDATA: "C:\\Users\\test\\AppData\\Local" }, "C:\\Users\\test"), "C:\\Users\\test\\AppData\\Local\\CodexThemeStudio"); checks += 1;
 assert.equal(statePathFor("win32", { LOCALAPPDATA: "C:\\Users\\test\\AppData\\Local" }, "C:\\Users\\test"), "C:\\Users\\test\\AppData\\Local\\CodexThemeStudio\\state.json"); checks += 1;
 assert.equal(stateRootFor("linux", { XDG_STATE_HOME: "/var/state" }, "/home/test"), "/var/state/codex-theme-studio"); checks += 1;
