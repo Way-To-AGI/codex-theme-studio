@@ -4,7 +4,7 @@
 
 一个面向官方 Codex 桌面应用的主题设计 Skill，支持 Agent 直创与 HTML 工作台两种创建模式，以及预览、应用、验证、导入、导出和安全恢复。
 
-![Codex Theme Studio 隐私安全合成产品预览](assets/social-preview.png)
+![Codex Theme Studio 运行蘑菇王国主题及软件内主题切换器](assets/social-preview.png)
 
 ## 主要能力
 
@@ -127,6 +127,8 @@ node scripts/theme.mjs studio
 ```
 
 网页主题库、软件内 `◐` 和这些命令共用同一个回环管理器及当前主题状态。`native` 只清除主题外观，保留快速切换能力；`restore` 会同时移除主题、软件内按钮、管理器和 watcher。
+
+![Codex Theme Studio 可视化主题库](assets/theme-library-preview.png)
 
 应用前检查推荐模式和配色质量：
 

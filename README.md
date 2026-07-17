@@ -4,7 +4,7 @@
 
 A Codex Skill with Agent-direct and HTML-studio creation modes for designing, generating, previewing, applying, validating, exporting, and safely restoring polished themes for the official Codex desktop app.
 
-![Codex Theme Studio — privacy-safe synthetic product preview](assets/social-preview.png)
+![Codex Theme Studio running with the Mushroom Kingdom theme and the in-app theme picker](assets/social-preview.png)
 
 ## Highlights
 
@@ -127,6 +127,8 @@ node scripts/theme.mjs studio
 ```
 
 The visual library, the in-app `◐` picker, and these commands share one loopback manager and one active-theme state. `native` removes theme paint but keeps quick switching available. `restore` removes the theme, in-app control, manager, and watcher.
+
+![Codex Theme Studio visual theme library](assets/theme-library-preview.png)
 
 Inspect the recommended appearance and palette quality before applying:
 
