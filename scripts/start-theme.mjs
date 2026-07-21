@@ -6,7 +6,8 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { loadTheme } from "./theme-core.mjs";
-import { commandFor, findBundledCodex, findOfficialApp, officialAppPids, requestOfficialAppQuit, securePrivateDirectory, securePrivateFile, statePathFor, stateRootFor } from "./platform-runtime.mjs";
+import { findBundledCodex, findOfficialApp, officialAppPids, requestOfficialAppQuit, securePrivateDirectory, securePrivateFile, statePathFor, stateRootFor } from "./platform-runtime.mjs";
+import { stopThemeWatcher, stopThemeWatchers } from "./runtime-lifecycle.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runtimePath = path.join(here, "runtime.mjs");
@@ -37,17 +38,6 @@ async function cdpReady(port) {
     if (!response.ok) return false;
     return (await response.json()).some((item) => item.type === "page" && String(item.url).startsWith("app://"));
   } catch { return false; }
-}
-
-async function stopPreviousWatcher(state) {
-  if (!state?.watcherPid) return;
-  const command = commandFor(state.watcherPid);
-  if (command.includes(runtimePath) && command.includes("--watch")) {
-    try { process.kill(state.watcherPid, "SIGTERM"); } catch { /* stale */ }
-    const deadline = Date.now() + 5000;
-    while (Date.now() < deadline && commandFor(state.watcherPid).includes(runtimePath)) await new Promise((resolve) => setTimeout(resolve, 100));
-    if (commandFor(state.watcherPid).includes(runtimePath)) throw new Error("Previous Theme Studio watcher did not stop cleanly");
-  }
 }
 
 async function waitReady(port, timeoutMs = 30000) {
@@ -99,9 +89,7 @@ console.log(JSON.stringify({
     : "This theme is designed for light appearance. Keep Codex in light mode to avoid mixed native surfaces.",
 }));
 await securePrivateDirectory(stateRoot);
-let previousState = null;
-try { previousState = JSON.parse(await fs.readFile(statePath, "utf8")); } catch { /* first run */ }
-await stopPreviousWatcher(previousState);
+await stopThemeWatchers(runtimePath, options.port);
 
 const runtimeAlreadyReady = await cdpReady(options.port);
 let executable = null;
@@ -169,7 +157,7 @@ for (let attempt = 0; attempt < 30; attempt += 1) {
   if (check.status === 0) { verified = true; break; }
 }
 if (!verified) {
-  stopPreviousWatcher({ watcherPid: watcher.pid });
+  await stopThemeWatcher(watcher.pid, runtimePath, options.port);
   await fs.rm(statePath, { force: true });
   throw new Error(`Theme was injected but live verification failed. See ${path.join(stateRoot, "watcher-error.log")}`);
 }

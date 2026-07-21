@@ -96,7 +96,9 @@ try {
   assert.match(runtime, /closeAllConnections/);
   assert.match(runtime, /CodexUsageProvider/);
   assert.match(runtime, /usesQuota/);
-  console.log(JSON.stringify({ pass: true, checks: 64 }, null, 2));
+  assert.match(runtime, /applyToLiveSessions/);
+  assert.match(runtime, /acquireWatcherLock/);
+  console.log(JSON.stringify({ pass: true, checks: 66 }, null, 2));
 } finally {
   await fs.rm(temporary, { recursive: true, force: true });
 }

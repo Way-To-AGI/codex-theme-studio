@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { listThemes, loadTheme } from "./theme-core.mjs";
 import { startThemeControl } from "./theme-control-server.mjs";
 import { openLoopbackUrl, securePrivateFile, statePathFor } from "./platform-runtime.mjs";
+import { acquireWatcherLock, releaseWatcherLock } from "./runtime-lifecycle.mjs";
 import { CodexUsageProvider } from "./usage-provider.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -45,6 +46,7 @@ class CdpSession {
     this.pending = new Map();
     this.listeners = new Map();
     this.closed = false;
+    this.closeListeners = [];
   }
 
   async open() {
@@ -52,6 +54,7 @@ class CdpSession {
       const timer = setTimeout(() => reject(new Error("CDP socket open timed out")), this.timeoutMs);
       this.socket.addEventListener("open", () => { clearTimeout(timer); resolve(); }, { once: true });
       this.socket.addEventListener("error", (event) => { clearTimeout(timer); reject(event.error ?? new Error("CDP socket failed")); }, { once: true });
+      this.socket.addEventListener("close", () => { clearTimeout(timer); reject(new Error("CDP session closed while opening")); }, { once: true });
     });
     this.socket.addEventListener("message", (event) => this.onMessage(event));
     this.socket.addEventListener("close", () => this.close());
@@ -78,6 +81,10 @@ class CdpSession {
     this.listeners.set(method, [...(this.listeners.get(method) ?? []), callback]);
   }
 
+  onClose(callback) {
+    this.closeListeners.push(callback);
+  }
+
   send(method, params = {}) {
     if (this.closed) return Promise.reject(new Error("CDP session is closed"));
     return new Promise((resolve, reject) => {
@@ -100,6 +107,7 @@ class CdpSession {
     try { this.socket.close(); } catch { /* already closed */ }
     for (const pending of this.pending.values()) { clearTimeout(pending.timer); pending.reject(new Error("CDP session closed")); }
     this.pending.clear();
+    for (const callback of this.closeListeners.splice(0)) callback();
   }
 }
 
@@ -277,11 +285,18 @@ async function runWatch(options) {
   let usageSnapshot = unavailableUsage();
   let payload = await loadPayload(options.theme, usageSnapshot);
   const sessions = new Map();
+  const pendingSessions = new Set();
   let usageProvider = null;
   let stopping = false;
   let queue = Promise.resolve();
+  let everConnected = false;
+  let missingTargetPasses = 0;
+  let shutdownPromise = null;
+  let controlServer = null;
   const statePath = options.statePath ?? statePathFor();
+  const lockPath = await acquireWatcherLock(statePath, options.port, { runtimePath: fileURLToPath(import.meta.url) });
   const control = options.controlPort && options.controlToken ? { port: options.controlPort, token: options.controlToken } : null;
+  try {
   const switcherExpression = await managerExpression(control ? { bridge: true } : null);
   const enqueue = (operation) => { const next = queue.then(operation, operation); queue = next.catch(() => {}); return next; };
   const saveActive = async (nextPayload) => {
@@ -324,9 +339,21 @@ async function runWatch(options) {
       usageProvider.start().catch(() => publishUsage(unavailableUsage("provider-unavailable")));
     }
   };
+  const liveSessions = () => {
+    for (const [id, session] of sessions) if (session.closed) sessions.delete(id);
+    return [...sessions.values()];
+  };
+  const applyToLiveSessions = async (operation) => {
+    const current = liveSessions();
+    const results = await Promise.allSettled(current.map(operation));
+    const failure = results.find((result, index) => result.status === "rejected" && !current[index].closed);
+    liveSessions();
+    if (failure) throw failure.reason;
+    return results.filter((result) => result.status === "fulfilled").length;
+  };
   const verifyCurrent = async () => {
     if (!payload) return true;
-    if (!sessions.size) throw new Error("No Codex renderer is connected to Theme Studio CDP");
+    if (!liveSessions().length) throw new Error("No Codex renderer is connected to Theme Studio CDP");
     for (const [id, session] of sessions) {
       const target = { id, url: session.target.url };
       const result = await session.evaluate(verifyExpression(payload.theme, isAuxiliaryTarget(target)));
@@ -334,30 +361,34 @@ async function runWatch(options) {
     }
     return true;
   };
-  let controlServer = null;
-  const stopWatching = () => {
+  const requestStop = () => {
     stopping = true;
     usageProvider?.stop();
     for (const session of sessions.values()) session.close();
+    for (const session of pendingSessions) session.close();
     controlServer?.server.closeAllConnections?.();
-    controlServer?.server.close();
   };
-  process.on("SIGINT", stopWatching);
-  process.on("SIGTERM", stopWatching);
+  const forceExitTimer = () => setTimeout(() => {
+    for (const session of sessions.values()) session.close();
+    for (const session of pendingSessions) session.close();
+    controlServer?.server.closeAllConnections?.();
+  }, 5000).unref();
+  process.once("SIGINT", () => { requestStop(); forceExitTimer(); });
+  process.once("SIGTERM", () => { requestStop(); forceExitTimer(); });
   const switchTheme = (themeId) => enqueue(async () => {
         const previous = payload;
         const candidate = await loadPayload(themeId);
         try {
           payload = candidate;
           syncUsageProvider();
-          await Promise.all([...sessions.values()].map((session) => applyCurrent(session, false)));
+          await applyToLiveSessions((session) => applyCurrent(session, false));
           await verifyCurrent();
           await saveActive(payload);
           return { activeTheme: payload.theme.id, themes: await listThemes(), designedFor: (await loadTheme(themeId)).manifest.appearance?.designedFor ?? "light" };
         } catch (error) {
           payload = previous;
           syncUsageProvider();
-          await Promise.allSettled([...sessions.values()].map((session) => applyCurrent(session, false)));
+          await Promise.allSettled(liveSessions().map((session) => applyCurrent(session, false)));
           throw new Error(`Theme switch rolled back: ${error.message}`);
         }
       });
@@ -366,16 +397,15 @@ async function runWatch(options) {
         try {
           payload = null;
           syncUsageProvider();
-          await Promise.all([...sessions.values()].map((session) => applyCurrent(session, false)));
+          await Promise.all(liveSessions().map((session) => applyCurrent(session, false)));
           await saveActive(null);
           return { activeTheme: null, themes: await listThemes(), native: true };
-        } catch (error) { payload = previous; syncUsageProvider(); await Promise.allSettled([...sessions.values()].map((session) => applyCurrent(session, false))); throw error; }
+        } catch (error) { payload = previous; syncUsageProvider(); await Promise.allSettled(liveSessions().map((session) => applyCurrent(session, false))); throw error; }
       });
   const shutdownTheme = () => enqueue(async () => {
         payload = null;
         syncUsageProvider();
-        await Promise.allSettled([...sessions.values()].map(async (session) => { await session.evaluate(removeExpression); await session.evaluate(removeManagerExpression); }));
-        await fs.rm(statePath, { force: true });
+        await Promise.allSettled(liveSessions().map(async (session) => { await session.evaluate(removeExpression); await session.evaluate(removeManagerExpression); }));
         stopping = true;
         return { restored: true, stopped: true };
       });
@@ -414,19 +444,31 @@ async function runWatch(options) {
   while (!stopping) {
     let targets = [];
     try { targets = await waitForTargets(options.port, 1800); }
-    catch (error) { console.error(`[theme-studio] ${error.message}`); await new Promise((resolve) => setTimeout(resolve, 900)); continue; }
+    catch (error) {
+      missingTargetPasses += 1;
+      if (everConnected && missingTargetPasses >= 2) { stopping = true; break; }
+      console.error(`[theme-studio] ${error.message}`);
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      continue;
+    }
+    missingTargetPasses = 0;
     const active = new Set(targets.map((target) => target.id));
     for (const [id, session] of sessions) {
       if (!active.has(id) || session.closed) { session.close(); sessions.delete(id); }
     }
     for (const target of targets) {
       if (sessions.has(target.id)) continue;
+      const session = new CdpSession(target, 10000);
+      pendingSessions.add(session);
       try {
-        const session = await new CdpSession(target, 10000).open();
+        await session.open();
+        session.onClose(() => { if (sessions.get(target.id) === session) sessions.delete(target.id); });
         session.on("Page.loadEventFired", () => setTimeout(() => applyCurrent(session).catch((error) => console.error(error.message)), 250));
         await applyCurrent(session);
         sessions.set(target.id, session);
-      } catch (error) { console.error(`[theme-studio] inject failed: ${error.message}`); }
+        everConnected = true;
+      } catch (error) { session.close(); console.error(`[theme-studio] inject failed: ${error.message}`); }
+      finally { pendingSessions.delete(session); }
     }
     for (const session of sessions.values()) {
       try { await drainBridge(session); }
@@ -434,10 +476,24 @@ async function runWatch(options) {
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  for (const session of sessions.values()) session.close();
-  usageProvider?.stop();
-  controlServer?.server.closeAllConnections?.();
-  controlServer?.server.close();
+  } finally {
+  shutdownPromise ??= (async () => {
+    usageProvider?.stop();
+    for (const session of sessions.values()) session.close();
+    for (const session of pendingSessions) session.close();
+    sessions.clear();
+    pendingSessions.clear();
+    if (controlServer?.server) {
+      controlServer.server.closeAllConnections?.();
+      await new Promise((resolve) => controlServer.server.close(() => resolve()));
+    }
+    let state = null;
+    try { state = JSON.parse(await fs.readFile(statePath, "utf8")); } catch { /* already removed */ }
+    if (state?.watcherPid === process.pid) await fs.rm(statePath, { force: true });
+    await releaseWatcherLock(lockPath);
+  })();
+  await shutdownPromise;
+  }
 }
 
 const options = parseArgs(process.argv.slice(2));
