@@ -16,6 +16,7 @@
 - 支持本地 PNG、JPEG、WebP 背景图，可配置焦点位置和阅读遮罩。
 - 支持 AI 背景图流程：工作台记录提示词，由 Codex 生图并将最终位图打包进主题。
 - 提供受信任、不可点击的安全装饰模板和实时碰撞检测。
+- 可选只读 Codex 剩余额度卡片，显示短/长周期剩余百分比、重置时间和陈旧状态；主题包不保存凭据。
 - 弹窗、紧凑窗口、结构锚点缺失或空间不足时自动隐藏装饰。
 - 使用本地回环 CDP 可逆注入，不修改签名应用和 `app.asar`。
 - 支持 `.codex-theme` 导入导出，并检查大小、路径和 CSS 安全性。
@@ -95,7 +96,7 @@ node scripts/studio-server.mjs --wait-for-submit
 1. 明暗模式和设计方向。
 2. 配色、圆角和阴影体系。
 3. 背景来源、构图位置和阅读遮罩。
-4. 装饰密度和主题文案。
+4. 装饰密度、可选剩余额度卡片和主题文案。
 
 点击“提交设计并让 Agent 继续”后，工作台会原子保存 `brief.json` 并把结果交回 Agent。页面会明确提示无需再发送消息；Agent 必须继续生成背景、编译、应用、截图验证和迭代，不能停在 HTML 页面。
 
@@ -203,6 +204,7 @@ node scripts/import-theme.mjs --input /absolute/path/theme.codex-theme
 - 拒绝远程 CSS 资源、可执行 CSS、危险资源路径和超过 30 MB 的主题包。
 - Theme Brief 不接受任意 HTML、选择器、脚本、事件处理器和坐标。
 - 所有装饰均为 `aria-hidden` 和 `pointer-events: none`。
+- 额度仅通过官方内置 `codex app-server` 读取，不向主题或渲染器暴露账户凭据、credits 余额，也不调用任何账户修改方法。
 - 根据原生控件实际位置测量安全空间，没有无碰撞位置时自动隐藏。
 - 保持原生控件尺寸、交互层级、状态色、代码、Diff、终端、弹窗和输入框行为。
 - 只停止命令行与本 Skill 匹配的主题守护进程。
@@ -213,6 +215,7 @@ node scripts/import-theme.mjs --input /absolute/path/theme.codex-theme
 node scripts/self-test.mjs
 node scripts/studio-protocol-test.mjs
 node scripts/theme-control-test.mjs
+node scripts/usage-provider-test.mjs
 node scripts/platform-runtime-test.mjs
 ```
 

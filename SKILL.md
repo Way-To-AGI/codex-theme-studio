@@ -1,6 +1,6 @@
 ---
 name: codex-theme-studio
-description: Interactively design, generate, preview, apply, hot-switch, verify, export, repair, or safely remove polished decorative themes for the official Codex desktop app on macOS or Windows. Use when a user wants a guided HTML theme studio, visual theme library, in-app theme picker, command-line theme switching, custom Codex skin from a brief or reference image, background image, coordinated colors, safe non-blocking decorations, portable .codex-theme package, live compatibility inspection, or one-click restoration without modifying ChatGPT.app, WindowsApps, or app.asar.
+description: Interactively design, generate, preview, apply, hot-switch, verify, export, repair, or safely remove polished decorative themes for the official Codex desktop app on macOS or Windows. Use when a user wants a guided HTML theme studio, visual theme library, in-app theme picker, command-line theme switching, custom Codex skin from a brief or reference image, background image, coordinated colors, a read-only remaining-quota card, safe non-blocking decorations, portable .codex-theme package, live compatibility inspection, or one-click restoration without modifying ChatGPT.app, WindowsApps, or app.asar.
 ---
 
 # Codex Theme Studio
@@ -18,9 +18,10 @@ Create reversible Codex themes through a constrained design brief and loopback C
 
 1. Treat the user's chat description and supplied references as the aesthetic brief. Make coherent design decisions autonomously instead of opening the HTML studio.
 2. Build a constrained `brief.json` that follows `references/theme-schema.md`; do not introduce arbitrary CSS, selectors, scripts, handlers, or coordinates through the brief.
-3. If artwork is needed, generate or prepare a local wide bitmap with quiet negative space behind the reading column and composer. Use only artwork the user is entitled to use.
-4. Compile with `node scripts/compile-theme.mjs --brief /absolute/brief.json [--art /absolute/art.png]`, then continue through preview, preflight, application, live verification, screenshot inspection, and iteration.
-5. Do not claim completion from brief creation or compilation alone. Apply the same appearance warning, restart authorization, static checks, live controls check, and screenshot QA used by the HTML flow.
+3. If the user asks to see remaining Codex quota, set `decorations.sidebarWidget.content` to `quota`. The runtime reads official account rate-limit snapshots; never put usage values or credentials in the brief.
+4. If artwork is needed, generate or prepare a local wide bitmap with quiet negative space behind the reading column and composer. Use only artwork the user is entitled to use.
+5. Compile with `node scripts/compile-theme.mjs --brief /absolute/brief.json [--art /absolute/art.png]`, then continue through preview, preflight, application, live verification, screenshot inspection, and iteration.
+6. Do not claim completion from brief creation or compilation alone. Apply the same appearance warning, restart authorization, static checks, live controls check, and screenshot QA used by the HTML flow.
 
 ## HTML studio creation
 
@@ -36,6 +37,7 @@ Create reversible Codex themes through a constrained design brief and loopback C
 ## Quick switching
 
 - Treat the web library, trusted in-app `◐` control, and CLI as three clients of the same loopback manager. Never implement separate active-theme state for an entry point.
+- The manager also owns the ephemeral quota snapshot. Start its read-only provider only while the active theme requests a quota card, and stop it when switching to native or a static-card theme.
 - Discover only validated `themes/<id>/<id>.json` manifests. A newly installed valid theme must appear without script changes.
 - Use `node scripts/theme.mjs use <id>` for normal switching. It hot-switches through the running manager and starts the manager only when necessary.
 - Use `native` to remove theme paint while keeping the manager and `◐` available. Use `restore` for a complete cleanup that also removes the manager control and watcher.
@@ -77,6 +79,7 @@ The bundled `aurora-focus` sample demonstrates a calm dark background and safe l
 ## Decoration policy
 
 - Use only the trusted `sidebar-gap-widget` and `bottom-corner-card` templates.
+- `sidebar-gap-widget` supports `static` and `quota` content. Quota content may remain visible on normal tasks when a collision-free sidebar gap exists; it remains supplemental, pointer-inert, and hidden in dialogs or compact windows.
 - Insert decoration nodes only as an `aria-hidden` body sibling of the native root.
 - Measure live geometry. Hide on collision, dialogs, compact windows, missing native anchors, or insufficient space.
 - Keep all decoration layers `pointer-events: none`; use plain text via `textContent`.
@@ -102,6 +105,7 @@ The bundled `aurora-focus` sample demonstrates a calm dark background and safe l
 - On Windows, accept only a valid OpenAI-signed `ChatGPT.exe` or `Codex.exe`; never weaken ACLs or force-terminate the app.
 - Never modify native `position`, `z-index`, layout ownership, or the geometry of `#root`.
 - Reject `@import`, external CSS URLs, executable CSS, unsafe asset names, and packages over 30 MB.
+- Read quota only through the bundled official `codex app-server` methods `account/rateLimits/read` and `account/rateLimits/updated`. Never expose credentials or credit balances to the renderer, and never invoke reset, consume, login, logout, or mutation methods.
 - Treat selectors as version-sensitive. If structural anchors fail after an update, fall back to token-only styling and report that repair is required.
 - Do not claim success from compilation or injection alone. Require static validation, live verification, and screenshot inspection.
 
@@ -113,6 +117,7 @@ Run:
 node scripts/self-test.mjs
 node scripts/studio-protocol-test.mjs
 node scripts/theme-control-test.mjs
+node scripts/usage-provider-test.mjs
 node scripts/platform-runtime-test.mjs
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" .
 ```

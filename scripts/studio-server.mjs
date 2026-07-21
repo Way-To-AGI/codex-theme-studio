@@ -11,6 +11,7 @@ import { openLoopbackUrl } from "./platform-runtime.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 const indexPath = path.join(root, "assets", "studio", "index.html");
+const sharedStylesPath = path.join(root, "assets", "shared", "studio-shell.css");
 
 function parseArgs(argv) {
   const options = {
@@ -82,6 +83,7 @@ function tokensMatch(actual, expected) {
 
 const options = parseArgs(process.argv.slice(2));
 const htmlTemplate = await fs.readFile(indexPath, "utf8");
+const sharedStyles = await fs.readFile(sharedStylesPath, "utf8");
 const sessionId = `${Date.now().toString(36)}-${crypto.randomBytes(6).toString("hex")}`;
 const sessionToken = crypto.randomBytes(24).toString("hex");
 const sessionDirectory = path.join(options.outputRoot, sessionId);
@@ -115,6 +117,15 @@ const server = http.createServer(async (request, response) => {
         "x-content-type-options": "nosniff",
       });
       response.end(html);
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/assets/studio-shell.css") {
+      response.writeHead(200, {
+        "content-type": "text/css; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      response.end(sharedStyles);
       return;
     }
     if (request.method === "GET" && url.pathname === "/api/health") {

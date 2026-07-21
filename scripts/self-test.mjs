@@ -14,12 +14,13 @@ try {
     direction: "aurora-glass",
     palette: { accent: "#64DDF2", support: "#A58BFA", surface: "#0D1420", ink: "#222222" },
     background: { source: "none", position: "center right", veil: 0.68 },
-    decorations: { density: "standard", sidebarWidget: { enabled: true }, cornerCard: { enabled: true } },
+    decorations: { density: "standard", sidebarWidget: { enabled: true, content: "quota" }, cornerCard: { enabled: true } },
   }, { outputRoot: temporary });
   assert.equal(result.manifest.engine, "codex-theme-studio");
   assert.ok(result.brief.corrections.includes("ink-adjusted-for-contrast"));
   assert.ok(contrastRatio(result.brief.palette.ink, result.brief.palette.surface) >= 4.5);
   assert.equal(result.manifest.decorations.cornerCard.enabled, true);
+  assert.equal(result.manifest.decorations.sidebarWidget.content, "quota");
   assert.equal(result.manifest.appearance.designedFor, "dark");
   assert.equal(result.manifest.quality.grade, "excellent");
   assert.ok(result.manifest.quality.checks.every((check) => check.pass));
@@ -48,6 +49,9 @@ try {
   assert.match(renderer, /aria-hidden/);
   assert.match(renderer, /interactiveRects/);
   assert.match(renderer, /dialogOpen/);
+  assert.match(renderer, /updateUsage/);
+  assert.match(renderer, /Quota unavailable/);
+  assert.doesNotMatch(renderer, /\bfetch\s*\(/);
   const unsafeLight = normalizeBrief({
     id: "unsafe-light",
     mode: "light",
@@ -71,6 +75,7 @@ try {
   const studio = await fs.readFile(new URL("../assets/studio/index.html", import.meta.url), "utf8");
   assert.doesNotMatch(studio, /https?:\/\//i);
   assert.doesNotMatch(studio, /result\.innerHTML/);
+  assert.match(studio, /id="quotaWidget"/);
   const switcher = await fs.readFile(new URL("../assets/switcher/index.html", import.meta.url), "utf8");
   const inAppSwitcher = await fs.readFile(new URL("../assets/theme-switcher.js", import.meta.url), "utf8");
   const cli = await fs.readFile(new URL("./theme.mjs", import.meta.url), "utf8");
@@ -89,7 +94,9 @@ try {
   assert.match(runtime, /\/avatar-overlay/);
   assert.match(runtime, /handleBridgeRequest/);
   assert.match(runtime, /closeAllConnections/);
-  console.log(JSON.stringify({ pass: true, checks: 56 }, null, 2));
+  assert.match(runtime, /CodexUsageProvider/);
+  assert.match(runtime, /usesQuota/);
+  console.log(JSON.stringify({ pass: true, checks: 64 }, null, 2));
 } finally {
   await fs.rm(temporary, { recursive: true, force: true });
 }

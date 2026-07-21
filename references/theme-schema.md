@@ -25,7 +25,7 @@ The studio accepts a constrained JSON brief and compiles it into a manifest, CSS
   "shape": { "radius": 18, "shadow": "soft" },
   "decorations": {
     "density": "light",
-    "sidebarWidget": { "enabled": true, "title": "Focus mode", "caption": "System ready", "icon": "✦" },
+    "sidebarWidget": { "enabled": true, "content": "quota", "title": "Focus mode", "caption": "System ready", "icon": "✦" },
     "cornerCard": { "enabled": true, "title": "Create calmly", "caption": "Ideas in motion", "icon": "A" }
   },
   "copy": { "tagline": "Build with clarity" }
@@ -38,7 +38,7 @@ The compiler treats `mode` as the intended official Codex appearance. It may adj
 
 `background.source` is `builtin`, `upload`, `generated`, or `none`. Generated artwork is produced by the agent outside the HTML server and then supplied with `--art`. PNG, JPEG, and WebP are accepted. Artwork remains local and is copied into the theme directory.
 
-`decorations.density` is `none`, `light`, or `standard`. The only supported templates are `sidebarWidget` and `cornerCard`; manifests cannot provide HTML, selectors, scripts, handlers, or arbitrary coordinates.
+`decorations.density` is `none`, `light`, or `standard`. The only supported templates are `sidebarWidget` and `cornerCard`; manifests cannot provide HTML, selectors, scripts, handlers, or arbitrary coordinates. `sidebarWidget.content` is `static` by default or `quota` for the trusted read-only remaining-quota view. Dynamic usage values are runtime state and are never serialized into the manifest or portable package.
 
 ## Compiled manifest
 

@@ -124,9 +124,10 @@ function paletteDefaults(mode, direction) {
   return picked;
 }
 
-function normalizeWidget(raw, defaults, enabled) {
+function normalizeWidget(raw, defaults, enabled, allowQuota = false) {
   return {
     enabled: enabled && raw?.enabled !== false,
+    content: allowQuota && raw?.content === "quota" ? "quota" : "static",
     icon: text(raw?.icon, defaults.icon, 4),
     eyebrow: text(raw?.eyebrow, defaults.eyebrow, 24),
     title: text(raw?.title, defaults.title, 32),
@@ -166,7 +167,7 @@ export function normalizeBrief(raw = {}) {
       density,
       sidebarWidget: normalizeWidget(raw.decorations?.sidebarWidget, {
         icon: "✦", eyebrow: "CODEX / STUDIO", title: "Focus mode", caption: "Theme synchronized",
-      }, allowSidebar),
+      }, allowSidebar, true),
       cornerCard: normalizeWidget(raw.decorations?.cornerCard, {
         icon: "C", eyebrow: "CREATIVE SPACE", title: "Build with clarity", caption: "Ideas in motion",
       }, allowCorner),
@@ -367,6 +368,16 @@ html.codex-theme-studio-skin :is(button, [role="button"], a):focus-visible {
 .cts-decoration-eyebrow { margin-top: 12px; color: var(--cts-accent); font-size: 9px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
 .cts-decoration-title { margin-top: 4px; color: var(--cts-ink); font-size: 14px; line-height: 1.25; font-weight: 760; }
 .cts-decoration-caption { margin-top: 5px; color: var(--cts-muted); font-size: 10px; line-height: 1.35; }
+.cts-sidebar-widget[data-content="quota"] .cts-decoration-icon { width: 24px; height: 24px; font-size: 10px; }
+.cts-sidebar-widget[data-content="quota"] .cts-decoration-eyebrow { margin-top: 7px; }
+.cts-sidebar-widget[data-content="quota"] .cts-decoration-title { font-size: 13px; }
+.cts-sidebar-widget[data-content="quota"] .cts-decoration-caption { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 8px; }
+.cts-quota-rows { display: grid; gap: 5px; margin-top: 7px; }
+.cts-quota-line { display: flex; align-items: center; justify-content: space-between; color: var(--cts-muted); font-size: 8px; font-variant-numeric: tabular-nums; }
+.cts-quota-value { color: var(--cts-ink); font-weight: 760; }
+.cts-quota-track { overflow: hidden; height: 3px; margin-top: 2px; border-radius: 99px; background: ${alpha(c.border, 0.48)}; }
+.cts-quota-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--cts-accent), ${palette.support}); }
+.cts-sidebar-widget[data-usage-status="stale"] .cts-quota-fill { opacity: .55; }
 .cts-sidebar-widget { width: 176px; height: 142px; }
 .cts-corner-card { width: 178px; height: 112px; transform: rotate(-2deg); }
 
