@@ -217,6 +217,7 @@ node scripts/studio-protocol-test.mjs
 node scripts/theme-control-test.mjs
 node scripts/usage-provider-test.mjs
 node scripts/platform-runtime-test.mjs
+node scripts/runtime-lifecycle-test.mjs
 ```
 
 安装为 Codex Skill 后，还可以执行：

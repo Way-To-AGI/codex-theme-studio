@@ -51,7 +51,7 @@ export function processRows(options = {}) {
   const platform = options.platform ?? process.platform;
   const run = options.spawnSyncImpl ?? spawnSync;
   if (platform === "win32") {
-    const script = "$items=Get-CimInstance Win32_Process | Where-Object { $_.Name -in @('ChatGPT.exe','Codex.exe') } | Select-Object @{n='pid';e={[int]$_.ProcessId}},@{n='command';e={[string]$_.CommandLine}},@{n='executable';e={[string]$_.ExecutablePath}}; if($items){$items | ConvertTo-Json -Compress}";
+    const script = "$items=Get-CimInstance Win32_Process | Select-Object @{n='pid';e={[int]$_.ProcessId}},@{n='command';e={[string]$_.CommandLine}},@{n='executable';e={[string]$_.ExecutablePath}}; if($items){$items | ConvertTo-Json -Compress}";
     const result = powershell(["-Command", script], { spawnSyncImpl: run });
     if (result.error) throw result.error;
     if (result.status !== 0) throw new Error((result.stderr || "Unable to inspect Windows processes").trim());

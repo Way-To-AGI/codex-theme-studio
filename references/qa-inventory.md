@@ -4,6 +4,7 @@
 
 - Skill validation and `scripts/self-test.mjs` pass.
 - `scripts/platform-runtime-test.mjs` passes, including Windows path, process, browser-open, and private-state contracts.
+- `scripts/runtime-lifecycle-test.mjs` passes, including exact watcher matching, duplicate locks, graceful exit, validated escalation, and stale-lock recovery.
 - Manifest ID/version match the live marker.
 - CSS contains no external resources, executable CSS, `#root` rule, or native layout mutation.
 - Artwork is local, decodable, and the exported package is at most 30 MB.
@@ -23,6 +24,7 @@
 - Web, in-app, and CLI clients report the same active theme and can hot-switch twice without restarting Codex.
 - The in-app switcher is a body sibling with an accessible label, overlaps zero native controls, and hides in dialogs and compact windows.
 - Native mode keeps only the trusted manager control; full restore removes both the theme and manager.
+- Full restore waits for every exact matching watcher to exit, releases the control port and watcher lock, and never terminates the Codex process.
 - A failed or unknown theme switch leaves the previous verified theme active.
 - A quota-enabled theme shows primary and secondary remaining percentages when available, updates without reinjection, marks stale data, and renders an explicit unavailable state instead of fabricated values.
 - The quota provider starts only for an active quota card, stops on static/native mode, and uses only read and update protocol methods.
