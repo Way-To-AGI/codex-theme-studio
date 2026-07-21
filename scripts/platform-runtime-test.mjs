@@ -72,7 +72,9 @@ assert.equal(await findBundledCodex("/Applications/ChatGPT.app/Contents/MacOS/Ch
   platform: "darwin", accessImpl: async (candidate) => { if (candidate !== "/Applications/ChatGPT.app/Contents/Resources/codex") throw new Error("missing"); },
 }), "/Applications/ChatGPT.app/Contents/Resources/codex"); checks += 1;
 assert.equal(await findBundledCodex("C:\\Apps\\ChatGPT\\ChatGPT.exe", {
-  platform: "win32", accessImpl: async (candidate) => { if (candidate !== "C:\\Apps\\ChatGPT\\resources\\codex.exe") throw new Error("missing"); },
+  platform: "win32", accessImpl: async (candidate) => {
+    if (path.win32.normalize(candidate).toLowerCase() !== path.win32.normalize("C:\\Apps\\ChatGPT\\resources\\codex.exe").toLowerCase()) throw new Error("missing");
+  },
 }), "C:\\Apps\\ChatGPT\\resources\\codex.exe"); checks += 1;
 await assert.rejects(findOfficialApp({
   platform: "win32",
