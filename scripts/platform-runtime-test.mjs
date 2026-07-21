@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { commandFor, findOfficialApp, isAllowedWindowsExecutable, officialAppPids, openLoopbackUrl, parseWindowsProcessJson, processRows, requestOfficialAppQuit, securePrivateDirectory, securePrivateFile, statePathFor, stateRootFor } from "./platform-runtime.mjs";
+import { commandFor, findBundledCodex, findOfficialApp, isAllowedWindowsExecutable, officialAppPids, openLoopbackUrl, parseWindowsProcessJson, processRows, requestOfficialAppQuit, securePrivateDirectory, securePrivateFile, statePathFor, stateRootFor } from "./platform-runtime.mjs";
 
 let checks = 0;
 const check = (condition) => { assert.ok(condition); checks += 1; };
@@ -68,6 +68,14 @@ const packagedExecutable = await findOfficialApp({
   },
 });
 assert.equal(packagedExecutable, "C:\\Program Files\\WindowsApps\\OpenAI.ChatGPT\\ChatGPT.exe"); checks += 1;
+assert.equal(await findBundledCodex("/Applications/ChatGPT.app/Contents/MacOS/ChatGPT", {
+  platform: "darwin", accessImpl: async (candidate) => { if (candidate !== "/Applications/ChatGPT.app/Contents/Resources/codex") throw new Error("missing"); },
+}), "/Applications/ChatGPT.app/Contents/Resources/codex"); checks += 1;
+assert.equal(await findBundledCodex("C:\\Apps\\ChatGPT\\ChatGPT.exe", {
+  platform: "win32", accessImpl: async (candidate) => {
+    if (path.win32.normalize(candidate).toLowerCase() !== path.win32.normalize("C:\\Apps\\ChatGPT\\resources\\codex.exe").toLowerCase()) throw new Error("missing");
+  },
+}), "C:\\Apps\\ChatGPT\\resources\\codex.exe"); checks += 1;
 await assert.rejects(findOfficialApp({
   platform: "win32",
   explicitPath: "C:\\Apps\\ChatGPT.exe",

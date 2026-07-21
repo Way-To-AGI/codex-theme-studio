@@ -6,7 +6,7 @@ import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { loadTheme } from "./theme-core.mjs";
-import { commandFor, findOfficialApp, officialAppPids, requestOfficialAppQuit, securePrivateDirectory, securePrivateFile, statePathFor, stateRootFor } from "./platform-runtime.mjs";
+import { commandFor, findBundledCodex, findOfficialApp, officialAppPids, requestOfficialAppQuit, securePrivateDirectory, securePrivateFile, statePathFor, stateRootFor } from "./platform-runtime.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runtimePath = path.join(here, "runtime.mjs");
@@ -103,9 +103,11 @@ let previousState = null;
 try { previousState = JSON.parse(await fs.readFile(statePath, "utf8")); } catch { /* first run */ }
 await stopPreviousWatcher(previousState);
 
-if (!(await cdpReady(options.port))) {
+const runtimeAlreadyReady = await cdpReady(options.port);
+let executable = null;
+if (!runtimeAlreadyReady) {
   await assertLoopbackPortAvailable(options.port);
-  const executable = await findOfficialApp({ explicitPath: options.appPath ?? process.env.CODEX_THEME_STUDIO_APP_PATH });
+  executable = await findOfficialApp({ explicitPath: options.appPath ?? process.env.CODEX_THEME_STUDIO_APP_PATH });
   if (officialAppPids(executable).length && !options.profilePath && !options.restartExisting) {
     throw new Error("Codex is already running without Theme Studio CDP. Close it or rerun with --restart-existing after explicit authorization.");
   }
@@ -124,11 +126,16 @@ if (!(await cdpReady(options.port))) {
   const child = spawn(executable, appArgs, { detached: true, stdio: ["ignore", log.fd, log.fd] });
   child.unref();
   await waitReady(options.port);
+} else {
+  try { executable = await findOfficialApp({ explicitPath: options.appPath ?? process.env.CODEX_THEME_STUDIO_APP_PATH }); }
+  catch { /* Themes without a quota card remain usable. */ }
 }
 
 const controlPort = await freeLoopbackPort();
 const controlToken = crypto.randomBytes(32).toString("hex");
-const controlArgs = ["--control-port", String(controlPort), "--control-token", controlToken, "--state-path", statePath];
+let codexPath = null;
+try { if (executable) codexPath = await findBundledCodex(executable); } catch { /* Quota card reports unavailable. */ }
+const controlArgs = ["--control-port", String(controlPort), "--control-token", controlToken, "--state-path", statePath, ...(codexPath ? ["--codex-path", codexPath] : [])];
 
 if (options.foreground) {
   const child = runRuntime(["--watch", "--port", String(options.port), "--theme", theme.manifestPath, ...controlArgs]);

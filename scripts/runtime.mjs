@@ -5,17 +5,19 @@ import { fileURLToPath } from "node:url";
 import { listThemes, loadTheme } from "./theme-core.mjs";
 import { startThemeControl } from "./theme-control-server.mjs";
 import { openLoopbackUrl, securePrivateFile, statePathFor } from "./platform-runtime.mjs";
+import { CodexUsageProvider } from "./usage-provider.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 
 function parseArgs(argv) {
-  const options = { port: 9335, controlPort: null, controlToken: null, statePath: null, mode: "watch", timeoutMs: 30000, screenshot: null, theme: null };
+  const options = { port: 9335, controlPort: null, controlToken: null, codexPath: null, statePath: null, mode: "watch", timeoutMs: 30000, screenshot: null, theme: null };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--port") options.port = Number(argv[++index]);
     else if (arg === "--control-port") options.controlPort = Number(argv[++index]);
     else if (arg === "--control-token") options.controlToken = argv[++index];
+    else if (arg === "--codex-path") options.codexPath = path.resolve(argv[++index]);
     else if (arg === "--state-path") options.statePath = path.resolve(argv[++index]);
     else if (arg === "--watch") options.mode = "watch";
     else if (arg === "--once") options.mode = "once";
@@ -123,7 +125,9 @@ function mimeType(filename) {
   return "image/png";
 }
 
-async function loadPayload(reference) {
+const unavailableUsage = (reason = "not-enabled") => ({ status: "unavailable", updatedAt: Date.now(), staleAt: Date.now(), reason });
+
+async function loadPayload(reference, usage = unavailableUsage()) {
   const theme = await loadTheme(reference);
   const template = await fs.readFile(path.join(root, "assets", "renderer-inject.js"), "utf8");
   const artDataUrl = theme.artPath ? `data:${mimeType(theme.artPath)};base64,${(await fs.readFile(theme.artPath)).toString("base64")}` : "";
@@ -139,9 +143,22 @@ async function loadPayload(reference) {
   const expression = template
     .replace("__CTS_CSS_JSON__", JSON.stringify(theme.css))
     .replace("__CTS_ART_JSON__", JSON.stringify(artDataUrl))
-    .replace("__CTS_THEME_JSON__", JSON.stringify(publicTheme));
+    .replace("__CTS_THEME_JSON__", JSON.stringify(publicTheme))
+    .replace("__CTS_USAGE_JSON__", JSON.stringify(usage));
   return { expression, theme: publicTheme };
 }
+
+function usesQuota(payload) {
+  return payload?.theme?.decorations?.sidebarWidget?.enabled === true
+    && payload.theme.decorations.sidebarWidget.content === "quota";
+}
+
+const usageUpdateExpression = (usage) => `(() => {
+  const state = window.__CODEX_THEME_STUDIO_STATE__;
+  if (!state?.updateUsage) return false;
+  state.usage = ${JSON.stringify(usage)};
+  return state.updateUsage(state.usage);
+})()`;
 
 const removeExpression = `(() => {
   window.__CODEX_THEME_STUDIO_DISABLED__ = true;
@@ -257,8 +274,10 @@ async function runOneShot(options) {
 }
 
 async function runWatch(options) {
-  let payload = await loadPayload(options.theme);
+  let usageSnapshot = unavailableUsage();
+  let payload = await loadPayload(options.theme, usageSnapshot);
   const sessions = new Map();
+  let usageProvider = null;
   let stopping = false;
   let queue = Promise.resolve();
   const statePath = options.statePath ?? statePathFor();
@@ -279,7 +298,31 @@ async function runWatch(options) {
   };
   const applyCurrent = async (session, refreshSwitcher = true) => {
     if (payload) await apply(session, payload); else await session.evaluate(removeExpression);
+    if (payload && usesQuota(payload)) await session.evaluate(usageUpdateExpression(usageSnapshot));
     if (refreshSwitcher && switcherExpression) await session.evaluate(switcherExpression);
+  };
+  const publishUsage = (snapshot) => {
+    usageSnapshot = snapshot;
+    if (!usesQuota(payload)) return;
+    for (const session of sessions.values()) {
+      session.evaluate(usageUpdateExpression(usageSnapshot)).catch((error) => console.error(`[theme-studio] quota update failed: ${error.message}`));
+    }
+  };
+  const syncUsageProvider = () => {
+    if (!usesQuota(payload)) {
+      usageProvider?.stop();
+      usageProvider = null;
+      usageSnapshot = unavailableUsage();
+      return;
+    }
+    if (!options.codexPath) {
+      publishUsage(unavailableUsage("app-server-unavailable"));
+      return;
+    }
+    if (!usageProvider) {
+      usageProvider = new CodexUsageProvider({ executable: options.codexPath, onUpdate: publishUsage });
+      usageProvider.start().catch(() => publishUsage(unavailableUsage("provider-unavailable")));
+    }
   };
   const verifyCurrent = async () => {
     if (!payload) return true;
@@ -294,6 +337,7 @@ async function runWatch(options) {
   let controlServer = null;
   const stopWatching = () => {
     stopping = true;
+    usageProvider?.stop();
     for (const session of sessions.values()) session.close();
     controlServer?.server.closeAllConnections?.();
     controlServer?.server.close();
@@ -305,12 +349,14 @@ async function runWatch(options) {
         const candidate = await loadPayload(themeId);
         try {
           payload = candidate;
+          syncUsageProvider();
           await Promise.all([...sessions.values()].map((session) => applyCurrent(session, false)));
           await verifyCurrent();
           await saveActive(payload);
           return { activeTheme: payload.theme.id, themes: await listThemes(), designedFor: (await loadTheme(themeId)).manifest.appearance?.designedFor ?? "light" };
         } catch (error) {
           payload = previous;
+          syncUsageProvider();
           await Promise.allSettled([...sessions.values()].map((session) => applyCurrent(session, false)));
           throw new Error(`Theme switch rolled back: ${error.message}`);
         }
@@ -319,13 +365,15 @@ async function runWatch(options) {
         const previous = payload;
         try {
           payload = null;
+          syncUsageProvider();
           await Promise.all([...sessions.values()].map((session) => applyCurrent(session, false)));
           await saveActive(null);
           return { activeTheme: null, themes: await listThemes(), native: true };
-        } catch (error) { payload = previous; await Promise.allSettled([...sessions.values()].map((session) => applyCurrent(session, false))); throw error; }
+        } catch (error) { payload = previous; syncUsageProvider(); await Promise.allSettled([...sessions.values()].map((session) => applyCurrent(session, false))); throw error; }
       });
   const shutdownTheme = () => enqueue(async () => {
         payload = null;
+        syncUsageProvider();
         await Promise.allSettled([...sessions.values()].map(async (session) => { await session.evaluate(removeExpression); await session.evaluate(removeManagerExpression); }));
         await fs.rm(statePath, { force: true });
         stopping = true;
@@ -337,6 +385,7 @@ async function runWatch(options) {
       listThemes,
       currentTheme: () => payload?.theme?.id ?? null,
       runtimeReady: () => sessions.size > 0,
+      currentUsage: () => usageSnapshot,
       readArtwork: async (id) => {
         const theme = await loadTheme(id);
         if (!theme.artPath) return null;
@@ -348,12 +397,13 @@ async function runWatch(options) {
     });
   }
   const handleBridgeRequest = async (request) => {
-    if (request.route === "themes") return { activeTheme: payload?.theme?.id ?? null, runtimeReady: sessions.size > 0, themes: await listThemes() };
+    if (request.route === "themes") return { activeTheme: payload?.theme?.id ?? null, runtimeReady: sessions.size > 0, usage: usageSnapshot, themes: await listThemes() };
     if (request.route === "switch") return switchTheme(request.body?.theme);
     if (request.route === "native") return nativeTheme();
     if (request.route === "open") { if (!controlServer) throw new Error("Theme library is unavailable"); openLoopbackUrl(controlServer.url); return { ok: true }; }
     throw new Error("Unsupported in-app theme action");
   };
+  syncUsageProvider();
   const drainBridge = async (session) => {
     const requests = await session.evaluate(bridgeDrainExpression);
     for (const request of Array.isArray(requests) ? requests : []) {
@@ -385,6 +435,7 @@ async function runWatch(options) {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   for (const session of sessions.values()) session.close();
+  usageProvider?.stop();
   controlServer?.server.closeAllConnections?.();
   controlServer?.server.close();
 }

@@ -16,6 +16,7 @@ A Codex Skill with Agent-direct and HTML-studio creation modes for designing, ge
 - Local PNG, JPEG, or WebP background artwork with a legibility veil and focal-position control.
 - Optional AI-art workflow: the studio records a background prompt, and Codex can generate and bundle the final bitmap.
 - Trusted, pointer-inert decoration templates with live collision detection.
+- Optional read-only Codex quota card with short/long-window remaining percentages, reset time, stale-state handling, and no credentials in theme packages.
 - Automatic hiding on dialogs, compact windows, missing anchors, or unsafe space.
 - Reversible loopback CDP injection; the signed app bundle and `app.asar` are never modified.
 - Portable `.codex-theme` import/export with size, path, and CSS safety validation.
@@ -95,7 +96,7 @@ The server binds only to `127.0.0.1` and opens the local studio in your browser.
 1. Mode and design direction.
 2. Palette, radius, and shadow system.
 3. Background source, focal position, and reading veil.
-4. Decoration density and copy.
+4. Decoration density, optional remaining-quota card, and copy.
 
 After **Submit design and continue**, the studio atomically saves `brief.json` and hands the result back to the Agent. The page says that no extra message is needed; the Agent must continue through artwork generation, compilation, application, screenshot verification, and iteration instead of stopping at the HTML page.
 
@@ -203,6 +204,7 @@ Replacing an existing theme requires the explicit `--force` flag.
 - Rejects remote CSS resources, executable CSS, unsafe asset paths, and packages larger than 30 MB.
 - Does not accept arbitrary HTML, selectors, scripts, handlers, or coordinates in theme briefs.
 - Keeps decorations `aria-hidden` and `pointer-events: none`.
+- Reads quota only from the bundled official `codex app-server`; it never exposes account credentials or credit balances and never calls mutable account methods.
 - Measures native controls and hides decoration when no collision-free slot exists.
 - Preserves native control geometry, interaction hierarchy, semantic states, code, diff, terminal, dialog, and composer behavior.
 - Stops only watcher processes whose command line matches this Skill.
@@ -213,6 +215,7 @@ Replacing an existing theme requires the explicit `--force` flag.
 node scripts/self-test.mjs
 node scripts/studio-protocol-test.mjs
 node scripts/theme-control-test.mjs
+node scripts/usage-provider-test.mjs
 node scripts/platform-runtime-test.mjs
 ```
 

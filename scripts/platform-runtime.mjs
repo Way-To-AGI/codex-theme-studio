@@ -161,6 +161,24 @@ export async function findOfficialApp(options = {}) {
   throw new Error("Official signed Codex app was not found. Use --app-path with the installed ChatGPT.exe or Codex.exe.");
 }
 
+export async function findBundledCodex(appExecutable, options = {}) {
+  const platform = options.platform ?? process.platform;
+  const access = options.accessImpl ?? fs.access;
+  const candidates = platform === "darwin"
+    ? [path.posix.resolve(path.posix.dirname(appExecutable), "..", "Resources", "codex")]
+    : platform === "win32"
+      ? [
+          path.win32.join(path.win32.dirname(appExecutable), "resources", "codex.exe"),
+          path.win32.join(path.win32.dirname(appExecutable), "Resources", "codex.exe"),
+        ]
+      : [];
+  for (const candidate of candidates) {
+    if (normalizedWindowsPath(candidate) === normalizedWindowsPath(appExecutable)) continue;
+    try { await access(candidate); return candidate; } catch { /* continue */ }
+  }
+  throw new Error("The official Codex app-server executable was not found");
+}
+
 export function requestOfficialAppQuit(executable, options = {}) {
   const platform = options.platform ?? process.platform;
   const run = options.spawnSyncImpl ?? spawnSync;

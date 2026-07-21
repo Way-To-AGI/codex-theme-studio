@@ -9,6 +9,7 @@ import { openLoopbackUrl } from "./platform-runtime.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 const switcherPath = path.join(root, "assets", "switcher", "index.html");
+const sharedStylesPath = path.join(root, "assets", "shared", "studio-shell.css");
 
 function tokenMatches(actual, expected) {
   const left = Buffer.from(String(actual || ""));
@@ -64,10 +65,11 @@ async function startStudio() {
 }
 
 export async function startThemeControl(options) {
-  const { port, token, listThemes, currentTheme, runtimeReady, switchTheme, nativeTheme, shutdownTheme, readArtwork } = options;
+  const { port, token, listThemes, currentTheme, runtimeReady, currentUsage = () => null, switchTheme, nativeTheme, shutdownTheme, readArtwork } = options;
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error(`Invalid control port: ${port}`);
   if (typeof token !== "string" || token.length < 32) throw new Error("Control token must contain at least 32 characters");
   const html = await fs.readFile(switcherPath, "utf8");
+  const sharedStyles = await fs.readFile(sharedStylesPath, "utf8");
   let origin = `http://127.0.0.1:${port}`;
   const server = http.createServer(async (request, response) => {
     const remote = request.socket.remoteAddress ?? "";
@@ -86,12 +88,16 @@ export async function startThemeControl(options) {
       if (request.method === "GET" && url.pathname === "/") {
         response.writeHead(200, {
           "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff",
-          "content-security-policy": "default-src 'self'; img-src 'self' blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+          "content-security-policy": "default-src 'self'; img-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'",
         });
         response.end(html); return;
       }
+      if (request.method === "GET" && url.pathname === "/assets/studio-shell.css") {
+        response.writeHead(200, { "content-type": "text/css; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" });
+        response.end(sharedStyles); return;
+      }
       if (!tokenMatches(request.headers["x-cts-token"], token)) return json(response, 403, { error: "Invalid control token" }, request.headers.origin || "*");
-      if (request.method === "GET" && url.pathname === "/api/themes") return json(response, 200, { activeTheme: currentTheme(), runtimeReady: runtimeReady(), themes: await listThemes() }, request.headers.origin || "*");
+      if (request.method === "GET" && url.pathname === "/api/themes") return json(response, 200, { activeTheme: currentTheme(), runtimeReady: runtimeReady(), usage: currentUsage(), themes: await listThemes() }, request.headers.origin || "*");
       if (request.method === "GET" && url.pathname.startsWith("/api/art/")) {
         const artwork = await readArtwork(decodeURIComponent(url.pathname.slice(9)));
         if (!artwork) return json(response, 404, { error: "Artwork not found" }, request.headers.origin || "*");

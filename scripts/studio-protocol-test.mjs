@@ -55,6 +55,11 @@ async function runSession(backgroundMode, artDataUrl = null, checkSecurity = fal
   assert.equal(ready.agentConnected, true);
   const html = await (await fetch(ready.url)).text();
   assert.doesNotMatch(html, /__CTS_SESSION_JSON__/);
+  assert.match(html, /Agent direct creation|Agent 直接创作/);
+  assert.match(html, /id="studioService"/);
+  const sharedStyles = await fetch(`${ready.url}assets/studio-shell.css`);
+  assert.equal(sharedStyles.status, 200);
+  assert.match(await sharedStyles.text(), /\.cts-service-panel/);
   const match = /const studioSession=(\{[^;]+\});/.exec(html);
   assert.ok(match, "Studio session must be injected into the HTML");
   const session = JSON.parse(match[1]);
@@ -67,7 +72,7 @@ async function runSession(backgroundMode, artDataUrl = null, checkSecurity = fal
     direction: "aurora-glass",
     palette: { accent: "#64DDF2", support: "#A58BFA", surface: "#0D1420", ink: "#F2F7FA" },
     background: { source: backgroundMode, prompt: "wide quiet composition" },
-    decorations: { density: "light" },
+    decorations: { density: "light", sidebarWidget: { content: "quota" } },
   };
 
   if (checkSecurity) {
@@ -103,6 +108,7 @@ async function runSession(backgroundMode, artDataUrl = null, checkSecurity = fal
   assert.equal(saved.background.source, backgroundMode);
   assert.equal(saved.appearance.designedFor, "dark");
   assert.equal(saved.quality.grade, "excellent");
+  assert.equal(saved.decorations.sidebarWidget.content, "quota");
   assert.ok(saved.quality.checks.every((check) => check.pass));
   if (artDataUrl) {
     assert.ok(responseEvent.artPath);
@@ -119,7 +125,7 @@ async function runSession(backgroundMode, artDataUrl = null, checkSecurity = fal
 try {
   await runSession("generated", null, true);
   await runSession("upload", "data:image/png;base64,iVBORw0KGgo=", false);
-  console.log(JSON.stringify({ pass: true, sessions: 2, checks: 28 }, null, 2));
+  console.log(JSON.stringify({ pass: true, sessions: 2, checks: 36 }, null, 2));
 } finally {
   await fs.rm(temporary, { recursive: true, force: true });
 }

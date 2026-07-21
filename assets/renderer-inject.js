@@ -1,4 +1,4 @@
-(async (cssText, artDataUrl, theme) => {
+(async (cssText, artDataUrl, theme, initialUsage) => {
   const STATE_KEY = "__CODEX_THEME_STUDIO_STATE__";
   const STYLE_ID = "codex-theme-studio-style";
   const DECORATIONS_ID = "codex-theme-studio-decorations";
@@ -54,6 +54,28 @@
     return node;
   };
 
+  const createQuotaRows = (parent) => {
+    const rows = document.createElement("div");
+    rows.className = "cts-quota-rows";
+    for (const slot of ["primary", "secondary"]) {
+      const row = document.createElement("div");
+      row.className = "cts-quota-row";
+      row.dataset.window = slot;
+      const line = document.createElement("div");
+      line.className = "cts-quota-line";
+      addText(line, "cts-quota-label", "—");
+      addText(line, "cts-quota-value", "—");
+      const track = document.createElement("div");
+      track.className = "cts-quota-track";
+      const fill = document.createElement("div");
+      fill.className = "cts-quota-fill";
+      track.appendChild(fill);
+      row.append(line, track);
+      rows.appendChild(row);
+    }
+    parent.appendChild(rows);
+  };
+
   const createCard = (className, config) => {
     const card = document.createElement("section");
     card.className = `cts-decoration-card ${className}`;
@@ -64,8 +86,69 @@
     addText(inner, "cts-decoration-eyebrow", config.eyebrow);
     addText(inner, "cts-decoration-title", config.title);
     addText(inner, "cts-decoration-caption", config.caption);
+    if (config.content === "quota") {
+      card.dataset.content = "quota";
+      createQuotaRows(inner);
+    }
     card.appendChild(inner);
     return card;
+  };
+
+  const durationLabel = (minutes) => {
+    if (!Number.isFinite(minutes) || minutes <= 0) return "Window";
+    if (minutes % 1440 === 0) return `${minutes / 1440}d`;
+    if (minutes % 60 === 0) return `${minutes / 60}h`;
+    return `${minutes}m`;
+  };
+
+  const resetLabel = (value) => {
+    if (!Number.isFinite(value)) return "";
+    try { return new Intl.DateTimeFormat(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }
+    catch { return ""; }
+  };
+
+  const renderQuotaRow = (card, slot, window) => {
+    const row = card.querySelector(`.cts-quota-row[data-window="${slot}"]`);
+    if (!row) return;
+    row.hidden = !window;
+    if (!window) return;
+    row.querySelector(".cts-quota-label").textContent = durationLabel(window.windowDurationMins);
+    row.querySelector(".cts-quota-value").textContent = `${window.remainingPercent}%`;
+    row.querySelector(".cts-quota-fill").style.width = `${window.remainingPercent}%`;
+  };
+
+  const updateUsage = (usage) => {
+    const card = document.querySelector(`#${DECORATIONS_ID} .cts-sidebar-widget[data-content="quota"]`);
+    if (!card) return false;
+    const chinese = navigator.language?.toLowerCase().startsWith("zh");
+    card.querySelector(".cts-decoration-icon").textContent = "%";
+    const eyebrow = card.querySelector(".cts-decoration-eyebrow");
+    const title = card.querySelector(".cts-decoration-title");
+    const caption = card.querySelector(".cts-decoration-caption");
+    eyebrow.textContent = "CODEX / QUOTA";
+    const usable = usage?.status === "ready" || usage?.status === "stale";
+    if (!usable || (!usage.primary && !usage.secondary && !usage.individual)) {
+      title.textContent = chinese ? "额度暂不可用" : "Quota unavailable";
+      caption.textContent = chinese ? "只读额度数据当前不可用" : "Read-only data is not available";
+      renderQuotaRow(card, "primary", null);
+      renderQuotaRow(card, "secondary", null);
+      card.dataset.usageStatus = "unavailable";
+      return true;
+    }
+    const primary = usage.primary ?? usage.individual;
+    const secondary = usage.secondary;
+    title.textContent = usage.reached
+      ? (chinese ? "额度已用尽" : "Limit reached")
+      : (chinese ? `剩余 ${primary?.remainingPercent ?? secondary?.remainingPercent}%` : `${primary?.remainingPercent ?? secondary?.remainingPercent}% remaining`);
+    const reset = resetLabel(primary?.resetsAt ?? secondary?.resetsAt);
+    const stateText = usage.status === "stale"
+      ? (chinese ? "数据可能已过期" : "May be outdated")
+      : (chinese ? "实时只读额度" : "Live read-only usage");
+    caption.textContent = `${stateText}${reset ? ` · ${chinese ? "重置" : "resets"} ${reset}` : ""}`;
+    renderQuotaRow(card, "primary", primary);
+    renderQuotaRow(card, "secondary", secondary);
+    card.dataset.usageStatus = usage.status;
+    return true;
   };
 
   const ensureDecorations = () => {
@@ -183,11 +266,13 @@
     if (home && main) main.classList.add("codex-theme-home-shell");
 
     const container = ensureDecorations();
+    updateUsage(window[STATE_KEY]?.usage ?? initialUsage);
     const sidebarWidget = container.querySelector(".cts-sidebar-widget");
     const cornerCard = container.querySelector(".cts-corner-card");
     const dialogOpen = Boolean(document.querySelector('[role="dialog"],[aria-modal="true"]'));
     const compact = innerWidth < 1180 || innerHeight < 720;
-    container.hidden = dialogOpen || compact || !home;
+    const quotaVisibleOnTasks = theme.decorations.sidebarWidget.content === "quota";
+    container.hidden = dialogOpen || compact || (!home && !quotaVisibleOnTasks);
     if (container.hidden) {
       const reason = dialogOpen ? "dialog-open" : compact ? "compact-window" : "not-home";
       hideCard(sidebarWidget, reason);
@@ -196,7 +281,8 @@
     }
     const controls = interactiveRects();
     placeSidebarWidget(sidebarWidget, document.querySelector("aside.app-shell-left-panel"), controls);
-    placeCornerCard(cornerCard, main, controls);
+    if (home) placeCornerCard(cornerCard, main, controls);
+    else hideCard(cornerCard, "not-home");
   };
 
   const cleanup = () => {
@@ -232,7 +318,7 @@
   const resize = () => schedule();
   addEventListener("resize", resize, { passive: true });
   const timer = setInterval(ensure, 4000);
-  window[STATE_KEY] = { cleanup, ensure, observer, resize, timer, scheduler, artUrl, themeId: theme.id, themeVersion: theme.version };
+  window[STATE_KEY] = { cleanup, ensure, updateUsage, usage: initialUsage, observer, resize, timer, scheduler, artUrl, themeId: theme.id, themeVersion: theme.version };
   ensure();
   return { installed: true, themeId: theme.id, version: theme.version };
-})(__CTS_CSS_JSON__, __CTS_ART_JSON__, __CTS_THEME_JSON__)
+})(__CTS_CSS_JSON__, __CTS_ART_JSON__, __CTS_THEME_JSON__, __CTS_USAGE_JSON__)

@@ -8,6 +8,7 @@
 - CSS contains no external resources, executable CSS, `#root` rule, or native layout mutation.
 - Artwork is local, decodable, and the exported package is at most 30 MB.
 - Body text contrast is at least 4.5:1.
+- Quota normalization clamps percentages, converts reset timestamps, preserves prior values across sparse null updates, and omits credit balances.
 
 ## Live functional
 
@@ -23,6 +24,8 @@
 - The in-app switcher is a body sibling with an accessible label, overlaps zero native controls, and hides in dialogs and compact windows.
 - Native mode keeps only the trusted manager control; full restore removes both the theme and manager.
 - A failed or unknown theme switch leaves the previous verified theme active.
+- A quota-enabled theme shows primary and secondary remaining percentages when available, updates without reinjection, marks stale data, and renders an explicit unavailable state instead of fabricated values.
+- The quota provider starts only for an active quota card, stops on static/native mode, and uses only read and update protocol methods.
 - On Windows, app discovery rejects unsigned executables, state is under `%LOCALAPPDATA%` with private ACLs, and an unauthorized or failed graceful close never force-terminates Codex.
 
 ## Visual
