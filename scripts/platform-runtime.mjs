@@ -165,7 +165,7 @@ export async function findBundledCodex(appExecutable, options = {}) {
   const platform = options.platform ?? process.platform;
   const access = options.accessImpl ?? fs.access;
   const candidates = platform === "darwin"
-    ? [path.resolve(path.dirname(appExecutable), "..", "Resources", "codex")]
+    ? [path.posix.resolve(path.posix.dirname(appExecutable), "..", "Resources", "codex")]
     : platform === "win32"
       ? [
           path.win32.join(path.win32.dirname(appExecutable), "resources", "codex.exe"),
